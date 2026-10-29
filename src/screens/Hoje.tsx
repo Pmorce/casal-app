@@ -3,7 +3,8 @@ import { useSession } from '../data/session'
 import { useToday } from '../hooks/useToday'
 import { useCollection } from '../data/useCollection'
 import { WEEKDAY_LABELS_PT, weekdayOf } from '../domain/dates'
-import type { FreezerBag, ShoppingItem } from '../domain/types'
+import { maybeMissing } from '../domain/shopping'
+import type { FreezerBag, Product, ShoppingItem } from '../domain/types'
 import RoutineToday from '../components/RoutineToday'
 import ChoresToday from '../components/ChoresToday'
 
@@ -12,7 +13,9 @@ export default function Hoje() {
   const today = useToday()
   const items = useCollection<ShoppingItem>('shopping')
   const bags = useCollection<FreezerBag>('freezerBags')
+  const products = useCollection<Product>('products')
   const toBuy = items.filter(i => i.status === 'porComprar').length
+  const missing = maybeMissing(products, items, today).length
   const cooked = bags.filter(b => b.category === 'feita').length
 
   return (
@@ -21,7 +24,7 @@ export default function Hoje() {
       <RoutineToday ownerUid={uid} day={today} />
       <ChoresToday />
       <div className="card inline" style={{ justifyContent: 'space-between' }}>
-        <Link to="/compras" style={{ color: 'inherit', textDecoration: 'none' }}>🛒 {toBuy} {toBuy === 1 ? 'item' : 'itens'} na lista</Link>
+        <Link to="/compras" style={{ color: 'inherit', textDecoration: 'none' }}>🛒 {toBuy} na lista{missing > 0 && ` · ${missing} talvez ${missing === 1 ? 'falte' : 'faltem'}`}</Link>
         <Link to="/congelador" style={{ color: 'inherit', textDecoration: 'none' }}>🧊 Comida feita: {cooked} {cooked === 1 ? 'saco' : 'sacos'}</Link>
       </div>
     </>

@@ -1,39 +1,54 @@
 import { useCallback, useState, type FormEvent } from 'react'
 import { useCollection } from '../data/useCollection'
 import { useSession } from '../data/session'
-import { addProduct, deleteProduct, moveProduct, renameProduct, setProductState } from '../data/shoppingRepo'
+import { useToday } from '../hooks/useToday'
+import { addProduct, boughtOutside, deleteProduct, markMissing, moveProduct, renameProduct, undoBought } from '../data/shoppingRepo'
 import { restore } from '../data/restore'
-import { checkRename, needsSync } from '../domain/pantry'
-import type { Product, ProductState, ShoppingItem } from '../domain/types'
+import { checkRename } from '../domain/pantry'
+import { rhythmOf } from '../domain/rhythm'
+import { ZONES } from '../domain/zones'
+import type { DateKey } from '../domain/dates'
+import type { Product, ShoppingItem, Zone } from '../domain/types'
 import UndoToast from '../components/UndoToast'
 
-const STATES: { value: ProductState; label: string }[] = [
-  { value: 'ha', label: 'Há' },
-  { value: 'aAcabar', label: 'A acabar' },
-  { value: 'acabou', label: 'Acabou' },
-]
-const PLACES: { value: Product['location']; label: string; short: string }[] = [
-  { value: 'frigorifico', label: 'Frigorífico', short: 'Frigorífico' },
-  { value: 'despensa', label: 'Despensa', short: 'Despensa' },
-  { value: 'limpeza', label: 'Limpeza e higiene', short: 'Limpeza' },
-]
+/** What the app knows about how often it is bought. */
+function rhythmNote(p: Product, today: DateKey): string {
+  const { gap, since } = rhythmOf(p, today)
+  if (since === null) return 'nunca comprado'
+  const ago = since === 0 ? 'comprado hoje' : `comprado há ${since} ${since === 1 ? 'dia' : 'dias'}`
+  return gap === null ? `${ago} · a aprender` : `${ago} · dura ~${gap}`
+}
 
 export default function Casa() {
   const { uid } = useSession()
+  const today = useToday()
   const products = useCollection<Product>('products')
   const items = useCollection<ShoppingItem>('shopping')
   const [name, setName] = useState('')
-  const [location, setLocation] = useState<Product['location']>('frigorifico')
+  const [location, setLocation] = useState<Zone>('frigorifico')
   const [msg, setMsg] = useState('')
   const [editing, setEditing] = useState(false)
-  const [undo, setUndo] = useState<ReturnType<typeof deleteProduct> | null>(null)
+  const [undo, setUndo] = useState<{ message: string; run: () => void } | null>(null)
   const closeUndo = useCallback(() => setUndo(null), [])
 
-  async function submit(e: FormEvent) {
+  function submit(e: FormEvent) {
     e.preventDefault()
     const r = addProduct(name, location, products)
     setMsg(r === 'duplicate' ? 'Esse produto já existe' : '')
     if (r === 'added') setName('')
+  }
+
+  function remove(p: Product) {
+    const done = deleteProduct(p, items)
+    setUndo({
+      message: `«${p.name}» apagado${done.items.length ? ' (e da lista)' : ''}`,
+      run: () => { restore('products', [done.product]); restore('shopping', done.items) },
+    })
+  }
+
+  function bought(p: Product) {
+    const done = boughtOutside(p, items, today)
+    setUndo({ message: `«${p.name}» comprado`, run: () => undoBought(done) })
   }
 
   return (
@@ -43,28 +58,30 @@ export default function Casa() {
         <button className="link-btn" onClick={() => setEditing(!editing)}>{editing ? 'Concluir' : 'Editar'}</button>
       </div>
       <p className="small muted" style={{ marginTop: -8 }}>
-        {editing ? 'Muda o nome ou o sítio; o nome grava ao sair da caixa.' : 'Marcar "a acabar" ou "acabou" põe na lista de compras.'}
+        {editing ? 'Muda o nome ou o sítio; o nome grava ao sair da caixa.' : '"Falta" põe na lista. "Comprei" é para o que compraram fora da lista.'}
       </p>
 
-      {PLACES.map(place => {
-        const list = products.filter(p => p.location === place.value).sort((a, b) => a.name.localeCompare(b.name, 'pt-PT'))
+      {ZONES.map(zone => {
+        const list = products.filter(p => p.location === zone.value).sort((a, b) => a.name.localeCompare(b.name, 'pt-PT'))
         return (
-          <div className="card" key={place.value}>
-            <div className="card-title">{place.label}</div>
+          <div className="card" key={zone.value}>
+            <div className="card-title">{zone.label}</div>
             {!list.length && <p className="small muted">Sem produtos ainda.</p>}
-            {list.map(p => editing ? (
-              <EditRow key={p.id} product={p} products={products} items={items} onDelete={() => setUndo(deleteProduct(p, items))} />
-            ) : (
-              <div className="row" key={p.id}>
-                <div className="grow">{p.name}</div>
-                <div className="seg compact" style={{ margin: 0, flex: 'none', width: 232 }}>
-                  {STATES.map(s => (
-                    <button key={s.value} className={p.state === s.value ? 'on' : ''}
-                      onClick={() => needsSync(p, s.value, items) && setProductState(p, s.value, items, uid)}>{s.label}</button>
-                  ))}
+            {list.map(p => {
+              if (editing) return <EditRow key={p.id} product={p} products={products} items={items} onDelete={() => remove(p)} />
+              const listed = items.some(i => i.productId === p.id)
+              return (
+                <div className="row" key={p.id}>
+                  <div className="grow">
+                    {p.name}
+                    <div className="note">{rhythmNote(p, today)}</div>
+                  </div>
+                  <button className="btn small" disabled={listed} aria-label={listed ? `${p.name} na lista` : `Falta ${p.name}`}
+                    onClick={() => markMissing(p, uid, items)}>{listed ? 'na lista' : 'Falta'}</button>
+                  <button className="btn small" aria-label={`Comprei ${p.name}`} onClick={() => bought(p)}>Comprei</button>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )
       })}
@@ -73,16 +90,15 @@ export default function Casa() {
         <div className="card-title">+ Produto</div>
         <input className="input" placeholder="Nome (ex.: Leite)" value={name} onChange={e => { setName(e.target.value); setMsg('') }} />
         <div className="seg" style={{ marginTop: 8 }}>
-          {PLACES.map(pl => (
-            <button type="button" key={pl.value} className={location === pl.value ? 'on' : ''} onClick={() => setLocation(pl.value)}>{pl.short}</button>
+          {ZONES.map(z => (
+            <button type="button" key={z.value} className={location === z.value ? 'on' : ''} onClick={() => setLocation(z.value)}>{z.short}</button>
           ))}
         </div>
         {msg && <p className="small error">{msg}</p>}
         <button className="btn primary block">Adicionar</button>
       </form>
 
-      {undo && <UndoToast message={`«${undo.product.name}» apagado${undo.items.length ? ' (e da lista)' : ''}`}
-        onUndo={() => { restore('products', [undo.product]); restore('shopping', undo.items) }} onClose={closeUndo} />}
+      {undo && <UndoToast message={undo.message} onUndo={undo.run} onClose={closeUndo} />}
     </>
   )
 }
@@ -105,8 +121,8 @@ function EditRow({ product, products, items, onDelete }: { product: Product; pro
         onChange={e => { setName(e.target.value); setError('') }} onBlur={commit}
         onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} style={{ minWidth: 0, flex: 1 }} />
       <select className="input" aria-label={`Sítio de ${product.name}`} value={product.location}
-        onChange={e => moveProduct(product, e.target.value as Product['location'])} style={{ width: 'auto', flex: 'none' }}>
-        {PLACES.map(pl => <option key={pl.value} value={pl.value}>{pl.short}</option>)}
+        onChange={e => moveProduct(product, e.target.value as Zone)} style={{ width: 'auto', flex: 'none' }}>
+        {ZONES.map(z => <option key={z.value} value={z.value}>{z.short}</option>)}
       </select>
       <button className="link-btn" onClick={onDelete}>Apagar</button>
       {error && <p className="small error" style={{ width: '100%', margin: 0 }}>{error}</p>}

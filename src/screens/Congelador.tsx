@@ -4,6 +4,7 @@ import { useSession } from '../data/session'
 import { useToday } from '../hooks/useToday'
 import { addSameAsLast, deleteBag, removeOldest, restoreBag, updateBag } from '../data/freezerRepo'
 import { addItem } from '../data/shoppingRepo'
+import { guessZone } from '../domain/zones'
 import { groupBags, isOld, parseAmount, summary, type FreezerGroup } from '../domain/freezer'
 import { daysBetween, type DateKey } from '../domain/dates'
 import type { FreezerBag, Product, ShoppingItem } from '../domain/types'
@@ -56,7 +57,7 @@ export default function Congelador() {
         <div className="card">
           <div>Acabou <strong>{askList}</strong>. Adicionar à lista de compras?</div>
           <div className="inline" style={{ marginTop: 8 }}>
-            <button className="btn primary" onClick={() => { addItem(askList, uid, products, items); setAskList(null) }}>Sim</button>
+            <button className="btn primary" onClick={() => { addItem(askList, uid, products, items, guessZone(askList)); setAskList(null) }}>Sim</button>
             <button className="btn" onClick={() => setAskList(null)}>Não</button>
           </div>
         </div>
