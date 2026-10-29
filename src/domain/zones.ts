@@ -28,7 +28,7 @@ const CLEANING = ['detergente', 'lixivia', 'papel higienico', 'rolo de cozinha',
   'pasta de dentes', 'escova', 'desodorizante', 'amaciador', 'esponja', 'saco do lixo', 'sacos do lixo', 'limpa', 'toalhitas',
   'algodao', 'cotonete', 'lenco', 'fralda', 'creme', 'pensos', 'tampoes', 'lamina']
 
-const has = (name: string, words: string[]) => words.some(w => new RegExp(`(^|\s)${w}`).test(name))
+const has = (name: string, words: string[]) => words.some(w => new RegExp(String.raw`(^|\s)${w}`).test(name))
 
 /** First guess for a new product's zone; the person confirms it with one tap. */
 export function guessZone(name: string): Zone {

@@ -1,15 +1,17 @@
-import { addItem, boughtOutside, finish } from './shoppingRepo'
+import { addItem, boughtOutside, finish, undoFinish } from './shoppingRepo'
 import { item, prod } from '../domain/testFactories'
 
 const fs = vi.hoisted(() => ({
   addDoc: vi.fn(async (_ref: unknown, _data: Record<string, unknown>) => ({ id: 'new' })),
   set: vi.fn(), update: vi.fn(), del: vi.fn(), commit: vi.fn(async () => {}),
+  updateDoc: vi.fn(async () => {}),
 }))
 vi.mock('./firebase', () => ({ db: {} }))
 vi.mock('firebase/firestore', async () => ({
   collection: vi.fn(() => 'shoppingRef'),
   doc: vi.fn((...args: unknown[]) => ({ id: String(args[2] ?? 'newId'), path: args.slice(1).join('/') })),
   addDoc: fs.addDoc,
+  updateDoc: fs.updateDoc,
   writeBatch: () => ({ set: fs.set, update: fs.update, delete: fs.del, commit: fs.commit }),
   deleteField: () => 'DEL',
   serverTimestamp: () => 'now',
@@ -60,13 +62,25 @@ test('"só desta vez" adds an item with no product', () => {
 test('finish records today as a purchase and skips deleted products', () => {
   finish([item({ id: 'i1', status: 'carrinho', productId: 'p1' }), item({ id: 'i2', status: 'carrinho', productId: 'gone' })],
     [prod({ id: 'p1', boughtKeys: ['2026-10-01'], snoozeCount: 2 })], '2026-10-29')
-  expect(fs.update).toHaveBeenCalledTimes(1)
-  expect(fs.update).toHaveBeenCalledWith(expect.anything(), { boughtKeys: ['2026-10-01', '2026-10-29'], snoozedUntil: 'DEL', snoozeCount: 'DEL' })
+  expect(fs.updateDoc).toHaveBeenCalledTimes(1)
+  expect(fs.updateDoc).toHaveBeenCalledWith(expect.anything(), { boughtKeys: ['2026-10-01', '2026-10-29'], snoozedUntil: 'DEL', snoozeCount: 'DEL' })
   expect(fs.del).toHaveBeenCalledTimes(2)
+  // a product deleted on the other phone must not make the server reject clearing the list
+  expect(fs.update).not.toHaveBeenCalled()
 })
 
 test('boughtOutside records the purchase and takes the pending item off the list', () => {
   boughtOutside(prod({ id: 'p1' }), [item({ id: 'i1', productId: 'p1', status: 'porComprar' }), item({ productId: 'p1', status: 'carrinho' })], '2026-10-29')
-  expect(fs.update).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ boughtKeys: ['2026-10-29'] }))
+  expect(fs.updateDoc).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ boughtKeys: ['2026-10-29'] }))
   expect(fs.del).toHaveBeenCalledTimes(1)
+  expect(fs.update).not.toHaveBeenCalled()
+})
+
+test('undoFinish puts the items back and deletes rhythm fields that did not exist before', () => {
+  const done = finish([item({ id: 'i1', status: 'carrinho', productId: 'p1', text: 'Café' })],
+    [prod({ id: 'p1', boughtKeys: ['2026-10-01'] })], '2026-10-29')
+  vi.clearAllMocks()
+  undoFinish(done)
+  expect(fs.set).toHaveBeenCalledWith(expect.objectContaining({ id: 'i1' }), expect.objectContaining({ text: 'Café', productId: 'p1' }))
+  expect(fs.updateDoc).toHaveBeenCalledWith(expect.anything(), { boughtKeys: ['2026-10-01'], snoozedUntil: 'DEL', snoozeCount: 'DEL' })
 })

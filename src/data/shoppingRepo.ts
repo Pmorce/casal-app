@@ -1,4 +1,4 @@
-import { addDoc, collection, deleteDoc, deleteField, doc, serverTimestamp, updateDoc, writeBatch } from 'firebase/firestore'
+import { addDoc, collection, deleteDoc, deleteField, doc, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore'
 import { db } from './firebase'
 import { fire } from './write'
 import { cleanText, findProduct, finishShopping, isOnList, normalize } from '../domain/shopping'
@@ -66,6 +66,12 @@ export function toggleCart(item: ShoppingItem): void {
   fire(updateDoc(doc(db, 'shopping', item.id), { status: item.status === 'carrinho' ? 'porComprar' : 'carrinho' }))
 }
 
+/**
+ * Product updates go one by one, outside the batch that clears the list: if the other phone deleted the
+ * product meanwhile, only that update fails instead of the server rejecting (and rolling back) everything.
+ */
+const updateProduct = (id: string, data: Record<string, unknown>) => fire(updateDoc(doc(db, 'products', id), data))
+
 type RhythmFields = Pick<Product, 'id' | 'boughtKeys' | 'snoozedUntil' | 'snoozeCount'>
 const rhythmFields = (p: Product): RhythmFields => ({ id: p.id, boughtKeys: p.boughtKeys, snoozedUntil: p.snoozedUntil, snoozeCount: p.snoozeCount })
 const purchased = (p: Product, today: DateKey) => ({ boughtKeys: recordPurchase(p.boughtKeys, today), snoozedUntil: deleteField(), snoozeCount: deleteField() })
@@ -88,16 +94,16 @@ export function finish(items: ShoppingItem[], products: Product[], today: DateKe
   const bought = products.filter(p => productIdsBought.includes(p.id))
   const batch = writeBatch(db)
   deleteIds.forEach(id => batch.delete(doc(db, 'shopping', id)))
-  bought.forEach(p => batch.update(doc(db, 'products', p.id), purchased(p, today)))
   fire(batch.commit())
+  bought.forEach(p => updateProduct(p.id, purchased(p, today)))
   return { items: items.filter(i => deleteIds.includes(i.id)), products: bought.map(rhythmFields) }
 }
 
 export function undoFinish(done: FinishedShopping): void {
   const batch = writeBatch(db)
   for (const { id, ...data } of done.items) batch.set(doc(db, 'shopping', id), data)
-  for (const p of done.products) batch.update(doc(db, 'products', p.id), restoreRhythm(p))
   fire(batch.commit())
+  done.products.forEach(p => updateProduct(p.id, restoreRhythm(p)))
 }
 
 export interface BoughtSnapshot {
@@ -108,18 +114,18 @@ export interface BoughtSnapshot {
 /** "Comprei": a purchase made outside the app (milk on the way home), so the rhythm stays right. */
 export function boughtOutside(p: Product, items: ShoppingItem[], today: DateKey): BoughtSnapshot {
   const pending = itemsOfProduct(p.id, items)
-  const batch = writeBatch(db)
-  batch.update(doc(db, 'products', p.id), purchased(p, today))
-  pending.forEach(i => batch.delete(doc(db, 'shopping', i.id)))
-  fire(batch.commit())
+  updateProduct(p.id, purchased(p, today))
+  if (pending.length) {
+    const batch = writeBatch(db)
+    pending.forEach(i => batch.delete(doc(db, 'shopping', i.id)))
+    fire(batch.commit())
+  }
   return { product: p, items: pending }
 }
 
 export function undoBought(s: BoughtSnapshot): void {
-  const batch = writeBatch(db)
-  batch.update(doc(db, 'products', s.product.id), restoreRhythm(s.product))
-  for (const { id, ...data } of s.items) batch.set(doc(db, 'shopping', id), data)
-  fire(batch.commit())
+  updateProduct(s.product.id, restoreRhythm(s.product))
+  for (const { id, ...data } of s.items) fire(setDoc(doc(db, 'shopping', id), data))
 }
 
 export function addProduct(name: string, location: Zone, products: Product[]): 'added' | 'duplicate' | 'empty' {

@@ -20,3 +20,10 @@ test('groupByZone groups by the product zone in fixed order, alphabetically', ()
   expect(g[1].items.map(i => i.text)).toEqual(['Arroz', 'Massa'])
   expect(g[3].items.map(i => i.text)).toEqual(['Órfão', 'Velho'])
 })
+
+test('guessZone finds the keyword anywhere in the name, not just the first word', () => {
+  expect(guessZone('Peito de frango')).toBe('frigorifico')
+  expect(guessZone('Creme de leite')).toBe('frigorifico')
+  expect(guessZone('Rolo de cozinha')).toBe('limpeza')
+  expect(guessZone('Massa espiral')).toBe('despensa') // "espiral" must not hit "pera"
+})
