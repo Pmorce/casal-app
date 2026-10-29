@@ -1,4 +1,4 @@
-import { normalize, isOnList, cleanText, findProduct, finishShopping } from './shopping'
+import { normalize, isOnList, cleanText, findProduct, finishShopping, backToCasa } from './shopping'
 import { item, prod } from './testFactories'
 
 test('normalize strips accents, case and extra spaces', () => {
@@ -32,4 +32,13 @@ test('finishShopping removes cart items and restores linked products only', () =
 test('finishShopping skips products that no longer exist', () => {
   expect(finishShopping([item({ id: 'a', status: 'carrinho', productId: 'gone' }), item({ id: 'b', status: 'carrinho', productId: 'p1' })], [prod({ id: 'p1' })]))
     .toEqual({ deleteIds: ['a', 'b'], productIdsToHa: ['p1'] })
+})
+
+test('backToCasa names only cart items linked to a product that still exists', () => {
+  expect(backToCasa([
+    item({ text: 'Café', status: 'carrinho', productId: 'gone' }),
+    item({ text: 'Leite', status: 'carrinho', productId: 'p1' }),
+    item({ text: 'Natas', status: 'carrinho' }),
+    item({ text: 'Ovos', status: 'porComprar', productId: 'p2' }),
+  ], [prod({ id: 'p1' }), prod({ id: 'p2' })])).toEqual(['Leite'])
 })

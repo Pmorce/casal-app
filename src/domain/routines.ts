@@ -38,3 +38,14 @@ export function monthHistory(routine: Routine, checks: RoutineCheck[], year: num
   }
   return out
 }
+
+/** The routine without links to a deleted checklist, or null when it had none. */
+export function unlinkChecklist(routine: Routine, checklistId: string): Routine | null {
+  if (!routine.steps.some(s => s.checklistId === checklistId)) return null
+  return { ...routine, steps: routine.steps.map(s => (s.checklistId === checklistId ? { ...s, checklistId: undefined } : s)) }
+}
+
+/** Named steps with no day picked: they would never appear, so saving asks for a day instead of dropping them. */
+export function stepsWithoutDays(steps: Step[]): string[] {
+  return steps.filter(s => s.text.trim() && !s.days.length).map(s => s.text.trim())
+}

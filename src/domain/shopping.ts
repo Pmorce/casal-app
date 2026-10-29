@@ -28,3 +28,9 @@ export function finishShopping(items: ShoppingItem[], products: Product[]): { de
     productIdsToHa: inCart.flatMap(i => (i.productId && existing.has(i.productId) ? [i.productId] : [])),
   }
 }
+
+/** Names that "Terminar compras" will really set back to "há" in Casa — the note must not promise more. */
+export function backToCasa(items: ShoppingItem[], products: Product[]): string[] {
+  const existing = new Set(products.map(p => p.id))
+  return items.filter(i => i.status === 'carrinho' && i.productId && existing.has(i.productId)).map(i => i.text)
+}

@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useCollection } from '../data/useCollection'
 import { useSession } from '../data/session'
 import { clearChecklist, deleteChecklist, newId, saveChecklist, toggleChecklistItem } from '../data/routinesRepo'
-import type { Checklist as ChecklistT } from '../domain/types'
+import type { Checklist as ChecklistT, Routine } from '../domain/types'
 
 /** Reusable checklist (e.g. packing a bag): tick while packing, "Limpar" to start over. Owner-only edits. */
 export default function Checklist() {
@@ -11,7 +11,11 @@ export default function Checklist() {
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const { uid, members } = useSession()
-  const list = useCollection<ChecklistT>('checklists').find(c => c.id === id)
+  const saved = useCollection<ChecklistT>('checklists').find(c => c.id === id)
+  const novo = (useLocation().state as { novo?: ChecklistT } | null)?.novo
+  const isNew = !saved && novo?.id === id
+  const list = saved ?? (isNew ? novo : undefined)
+  const myRoutines = useCollection<Routine>('routines', ['ownerUid', '==', uid])
   const [draft, setDraft] = useState<ChecklistT | null>(null)
   const [newItem, setNewItem] = useState('')
 
@@ -50,8 +54,15 @@ export default function Checklist() {
           </form>
         </div>
         <button className="btn primary block" onClick={done}>Guardar</button>
-        <button className="link-btn" style={{ color: 'var(--danger)' }}
-          onClick={async () => { if (confirm('Apagar esta checklist?')) { deleteChecklist(id); navigate('/mais/rotinas') } }}>Apagar checklist</button>
+        <div className="inline" style={{ justifyContent: 'space-between', marginTop: 8 }}>
+          <button className="link-btn" onClick={() => {
+            setDraft(null)
+            if (isNew) navigate('/mais/rotinas', { replace: true })
+            else navigate(`/mais/checklists/${id}`, { replace: true })
+          }}>Cancelar</button>
+          {!isNew && <button className="link-btn" style={{ color: 'var(--danger)' }}
+            onClick={async () => { if (confirm('Apagar esta checklist?')) { deleteChecklist(id, myRoutines); navigate('/mais/rotinas') } }}>Apagar checklist</button>}
+        </div>
       </>
     )
   }

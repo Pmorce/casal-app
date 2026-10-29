@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useCollection } from '../data/useCollection'
 import { useSession } from '../data/session'
-import { newId, saveChecklist, saveRoutine } from '../data/routinesRepo'
+import { newId } from '../data/routinesRepo'
 import { todayKey } from '../domain/dates'
 import type { Checklist, Routine } from '../domain/types'
 
@@ -15,16 +15,17 @@ export default function Rotinas() {
   const checklists = useCollection<Checklist>('checklists', ['ownerUid', '==', owner])
   const mine = owner === uid
 
+  // new ones are only written on "Guardar", so cancelling leaves nothing behind
   async function newRoutine() {
     const id = newId('routines')
-    saveRoutine({ id, ownerUid: uid, name: 'Nova rotina', order: routines.length, steps: [], createdKey: todayKey(new Date()) })
-    navigate(`/mais/rotinas/${id}?editar=1`)
+    const novo: Routine = { id, ownerUid: uid, name: 'Nova rotina', order: routines.length, steps: [], createdKey: todayKey(new Date()) }
+    navigate(`/mais/rotinas/${id}?editar=1`, { state: { novo } })
   }
 
   async function newChecklist() {
     const id = newId('checklists')
-    saveChecklist({ id, ownerUid: uid, name: 'Nova checklist', items: [], checkedIds: [] })
-    navigate(`/mais/checklists/${id}?editar=1`)
+    const novo: Checklist = { id, ownerUid: uid, name: 'Nova checklist', items: [], checkedIds: [] }
+    navigate(`/mais/checklists/${id}?editar=1`, { state: { novo } })
   }
 
   return (

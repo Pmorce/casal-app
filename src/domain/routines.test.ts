@@ -1,4 +1,4 @@
-import { stepsFor, dayStatus, monthHistory, checkDocId } from './routines'
+import { stepsFor, dayStatus, monthHistory, checkDocId, unlinkChecklist, stepsWithoutDays } from './routines'
 import { routine, step } from './testFactories'
 
 const r = routine({
@@ -41,4 +41,14 @@ test('history uses the steps that applied on that day, not today\'s list', () =>
   const now = routine({ id: 'r2', steps: [step({ id: 'a' }), step({ id: 'new' })] }) // 'new' added later
   const h = monthHistory(now, [{ id: 'x', ownerUid: 'B', routineId: 'r2', dateKey: '2026-02-03', doneStepIds: ['a'], dayStepIds: ['a'] }], 2026, 2)
   expect(h[2].status).toBe('completo')
+})
+
+test('unlinkChecklist drops the link from steps that open a deleted checklist', () => {
+  const r2 = routine({ steps: [step({ id: 'a', checklistId: 'c1' }), step({ id: 'b' })] })
+  expect(unlinkChecklist(r2, 'c1')?.steps.map(s => s.checklistId)).toEqual([undefined, undefined])
+  expect(unlinkChecklist(r2, 'other')).toBeNull()
+})
+
+test('stepsWithoutDays lists named steps that would never show up', () => {
+  expect(stepsWithoutDays([step({ text: 'Creme', days: [] }), step({ text: '', days: [] }), step({ text: 'Ok' })])).toEqual(['Creme'])
 })

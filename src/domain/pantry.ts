@@ -16,3 +16,14 @@ export function onProductStateChange(product: Product, next: ProductState, items
   if (linked) return [{ type: 'setReason', itemId: linked.id, productId: product.id, reason: next }]
   return [{ type: 'addItem', text: product.name, productId: product.id, reason: next }]
 }
+
+/** What a deleted Casa product leaves behind on the list (cart items stay: they are being bought). */
+export function itemsOfProduct(productId: string, items: ShoppingItem[]): ShoppingItem[] {
+  return items.filter(i => i.productId === productId && i.status === 'porComprar')
+}
+
+/** Tapping the current state is a no-op, except "a acabar"/"acabou" when the item was taken off the list: then it goes back. */
+export function needsSync(product: Product, next: ProductState, items: ShoppingItem[]): boolean {
+  if (product.state !== next) return true
+  return next !== 'ha' && !items.some(i => i.productId === product.id)
+}

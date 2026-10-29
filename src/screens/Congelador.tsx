@@ -30,7 +30,7 @@ export default function Congelador() {
   const [category, setCategory] = useState<FreezerBag['category']>('carne')
   const [adding, setAdding] = useState(false)
   const [open, setOpen] = useState<string | null>(null)
-  const [undo, setUndo] = useState<FreezerBag | null>(null)
+  const [undo, setUndo] = useState<{ bag: FreezerBag; message: string } | null>(null)
   const [askList, setAskList] = useState<string | null>(null)
   const closeUndo = useCallback(() => setUndo(null), [])
 
@@ -39,7 +39,7 @@ export default function Congelador() {
 
   async function minus(g: FreezerGroup) {
     const wasLast = g.bags.length === 1
-    setUndo(removeOldest(g))
+    setUndo({ bag: removeOldest(g), message: 'Saco retirado' })
     if (wasLast) setAskList(g.name)
   }
 
@@ -84,14 +84,14 @@ export default function Congelador() {
             {open === g.key && g.bags.map(b => (
               <div className="row small" key={b.id}>
                 <span className="grow">{num.format(b.amount)} {UNIT_LABEL[b.unit]} · entrou {age(b.addedKey, today)}</span>
-                <button className="link-btn" onClick={() => deleteBag(b.id)}>Apagar</button>
+                <button className="link-btn" onClick={() => { deleteBag(b.id); setUndo({ bag: b, message: 'Saco apagado' }) }}>Apagar</button>
               </div>
             ))}
           </div>
         )
       })}
 
-      {undo && <UndoToast message="Saco retirado" onUndo={() => { restoreBag(undo); setAskList(null) }} onClose={closeUndo} />}
+      {undo && <UndoToast message={undo.message} onUndo={() => { restoreBag(undo.bag); setAskList(null) }} onClose={closeUndo} />}
     </>
   )
 }

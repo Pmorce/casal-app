@@ -1,8 +1,11 @@
-import { useState, type FormEvent } from 'react'
+import { useCallback, useState, type FormEvent } from 'react'
 import { useCollection } from '../data/useCollection'
 import { useSession } from '../data/session'
 import { addProduct, deleteProduct, setProductState } from '../data/shoppingRepo'
+import { restore } from '../data/restore'
+import { needsSync } from '../domain/pantry'
 import type { Product, ProductState, ShoppingItem } from '../domain/types'
+import UndoToast from '../components/UndoToast'
 
 const STATES: { value: ProductState; label: string }[] = [
   { value: 'ha', label: 'Há' },
@@ -22,6 +25,8 @@ export default function Casa() {
   const [location, setLocation] = useState<Product['location']>('frigorifico')
   const [msg, setMsg] = useState('')
   const [editing, setEditing] = useState(false)
+  const [undo, setUndo] = useState<ReturnType<typeof deleteProduct> | null>(null)
+  const closeUndo = useCallback(() => setUndo(null), [])
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -48,12 +53,12 @@ export default function Casa() {
               <div className="row" key={p.id}>
                 <div className="grow">{p.name}</div>
                 {editing ? (
-                  <button className="link-btn" onClick={() => deleteProduct(p.id)}>Apagar</button>
+                  <button className="link-btn" onClick={() => setUndo(deleteProduct(p, items))}>Apagar</button>
                 ) : (
                   <div className="seg compact" style={{ margin: 0, flex: "none", width: 232 }}>
                     {STATES.map(s => (
                       <button key={s.value} className={p.state === s.value ? 'on' : ''}
-                        onClick={() => p.state !== s.value && setProductState(p, s.value, items, uid)}>{s.label}</button>
+                        onClick={() => needsSync(p, s.value, items) && setProductState(p, s.value, items, uid)}>{s.label}</button>
                     ))}
                   </div>
                 )}
@@ -74,6 +79,9 @@ export default function Casa() {
         {msg && <p className="small error">{msg}</p>}
         <button className="btn primary block">Adicionar</button>
       </form>
+
+      {undo && <UndoToast message={`«${undo.product.name}» apagado${undo.items.length ? ' (e da lista)' : ''}`}
+        onUndo={() => { restore('products', [undo.product]); restore('shopping', undo.items) }} onClose={closeUndo} />}
     </>
   )
 }

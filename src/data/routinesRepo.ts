@@ -1,7 +1,7 @@
-import { arrayRemove, arrayUnion, collection, deleteDoc, doc, setDoc, updateDoc } from 'firebase/firestore'
+import { arrayRemove, arrayUnion, collection, deleteDoc, doc, setDoc, updateDoc, writeBatch } from 'firebase/firestore'
 import { db } from './firebase'
 import { fire } from './write'
-import { checkDocId, stepsOfDay } from '../domain/routines'
+import { checkDocId, stepsOfDay, unlinkChecklist } from '../domain/routines'
 import type { DateKey } from '../domain/dates'
 import type { Checklist, Routine } from '../domain/types'
 
@@ -43,4 +43,13 @@ export function saveChecklist(c: Checklist): void {
   fire(setDoc(doc(db, 'checklists', id), stripUndefined(data)))
 }
 
-export const deleteChecklist = (id: string) => fire(deleteDoc(doc(db, 'checklists', id)))
+/** Also unlinks the steps that opened it, so no routine points to a missing checklist. */
+export function deleteChecklist(id: string, routines: Routine[]): void {
+  const batch = writeBatch(db)
+  batch.delete(doc(db, 'checklists', id))
+  for (const r of routines) {
+    const next = unlinkChecklist(r, id)
+    if (next) batch.update(doc(db, 'routines', r.id), { steps: stripUndefined(next.steps) })
+  }
+  fire(batch.commit())
+}

@@ -2,7 +2,7 @@ import { addDoc, collection, deleteDoc, doc, serverTimestamp, updateDoc, writeBa
 import { db } from './firebase'
 import { fire } from './write'
 import { cleanText, findProduct, finishShopping, isOnList, normalize } from '../domain/shopping'
-import { onProductStateChange } from '../domain/pantry'
+import { itemsOfProduct, onProductStateChange } from '../domain/pantry'
 import type { Product, ProductState, ShoppingItem, ShortageReason } from '../domain/types'
 
 export function addItem(
@@ -31,12 +31,29 @@ export function toggleCart(item: ShoppingItem): void {
   fire(updateDoc(doc(db, 'shopping', item.id), { status: item.status === 'carrinho' ? 'porComprar' : 'carrinho' }))
 }
 
-/** "Terminar compras": drop everything in the cart and mark linked products as "há". */
-export function finish(items: ShoppingItem[], products: Product[]): void {
+export interface FinishedShopping {
+  items: ShoppingItem[]
+  /** products set to "há", with the state they had before */
+  products: Pick<Product, 'id' | 'state'>[]
+}
+
+/** "Terminar compras": drop everything in the cart and mark linked products as "há". Returns what undo needs. */
+export function finish(items: ShoppingItem[], products: Product[]): FinishedShopping {
   const { deleteIds, productIdsToHa } = finishShopping(items, products)
   const batch = writeBatch(db)
   deleteIds.forEach(id => batch.delete(doc(db, 'shopping', id)))
   productIdsToHa.forEach(id => batch.update(doc(db, 'products', id), { state: 'ha' }))
+  fire(batch.commit())
+  return {
+    items: items.filter(i => deleteIds.includes(i.id)),
+    products: products.filter(p => productIdsToHa.includes(p.id)).map(p => ({ id: p.id, state: p.state })),
+  }
+}
+
+export function undoFinish(done: FinishedShopping): void {
+  const batch = writeBatch(db)
+  for (const { id, ...data } of done.items) batch.set(doc(db, 'shopping', id), data)
+  for (const p of done.products) batch.update(doc(db, 'products', p.id), { state: p.state })
   fire(batch.commit())
 }
 
@@ -66,4 +83,13 @@ export function addProduct(name: string, location: Product['location'], products
 }
 
 export const deleteItem = (id: string) => fire(deleteDoc(doc(db, 'shopping', id)))
-export const deleteProduct = (id: string) => fire(deleteDoc(doc(db, 'products', id)))
+
+/** Deletes the product and the item it left on the list; returns both so the UI can undo. */
+export function deleteProduct(p: Product, items: ShoppingItem[]): { product: Product; items: ShoppingItem[] } {
+  const linked = itemsOfProduct(p.id, items)
+  const batch = writeBatch(db)
+  batch.delete(doc(db, 'products', p.id))
+  linked.forEach(i => batch.delete(doc(db, 'shopping', i.id)))
+  fire(batch.commit())
+  return { product: p, items: linked }
+}

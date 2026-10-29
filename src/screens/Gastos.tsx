@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useCallback, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useCollection } from '../data/useCollection'
 import { useSession } from '../data/session'
@@ -6,6 +6,8 @@ import { useToday } from '../hooks/useToday'
 import { addExpense, deleteExpense } from '../data/expensesRepo'
 import { formatEuros, monthTotals, parseEuros } from '../domain/expenses'
 import type { Expense } from '../domain/types'
+import UndoToast from '../components/UndoToast'
+import { restore } from '../data/restore'
 
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 
@@ -18,6 +20,8 @@ export default function Gastos() {
   const [dateKey, setDateKey] = useState(today)
   const [note, setNote] = useState('')
   const [error, setError] = useState('')
+  const [undo, setUndo] = useState<Expense | null>(null)
+  const closeUndo = useCallback(() => setUndo(null), [])
   const [ym, setYm] = useState(() => ({ y: Number(today.slice(0, 4)), m: Number(today.slice(5, 7)) }))
 
   async function submit(e: FormEvent) {
@@ -44,21 +48,19 @@ export default function Gastos() {
       <h1>Gastos do supermercado</h1>
 
       <form className="card" onSubmit={submit}>
-        <div className="inline">
-          <input className="input" inputMode="decimal" placeholder="Valor (ex.: 12,50)" value={value}
-            onChange={e => { setValue(e.target.value); setError('') }} />
-          <button className="btn primary">Registar</button>
-        </div>
-        <div className="seg" style={{ marginTop: 8 }}>
+        <div className="seg">
           {Object.entries(members).map(([id, name]) => (
             <button type="button" key={id} className={who === id ? 'on' : ''} onClick={() => setWho(id)}>{name}</button>
           ))}
         </div>
-        <div className="inline">
+        <input className="input" inputMode="decimal" placeholder="Valor (ex.: 12,50)" value={value}
+          onChange={e => { setValue(e.target.value); setError('') }} />
+        <div className="inline" style={{ marginTop: 8 }}>
           <input className="input" type="date" value={dateKey} onChange={e => setDateKey(e.target.value)} style={{ flex: 1 }} />
           <input className="input" placeholder="Nota (opcional)" value={note} onChange={e => setNote(e.target.value)} style={{ flex: 1 }} />
         </div>
         {error && <p className="error">{error}</p>}
+        <button className="btn primary block">Registar</button>
       </form>
 
       <div className="card">
@@ -79,11 +81,12 @@ export default function Gastos() {
             <div className="row small" key={e.id}>
               <span className="grow">{e.dateKey.slice(8)}/{e.dateKey.slice(5, 7)} · {members[e.uid] ?? '?'}{e.note ? ` · ${e.note}` : ''}</span>
               <span>{formatEuros(e.cents)}</span>
-              <button className="link-btn" aria-label="Apagar registo" onClick={() => confirm('Apagar este registo?') && deleteExpense(e.id)}>✕</button>
+              <button className="link-btn" aria-label="Apagar registo" onClick={() => { deleteExpense(e.id); setUndo(e) }}>✕</button>
             </div>
           ))}
         </div>
       )}
+      {undo && <UndoToast message={`Registo de ${formatEuros(undo.cents)} apagado`} onUndo={() => restore('expenses', [undo])} onClose={closeUndo} />}
     </>
   )
 }

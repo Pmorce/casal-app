@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useCallback, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useCollection } from '../data/useCollection'
 import { useSession } from '../data/session'
@@ -7,6 +7,8 @@ import { addChore, deleteChore } from '../data/choresRepo'
 import { daysBetween, WEEKDAY_LABELS_PT, type Weekday } from '../domain/dates'
 import type { Chore } from '../domain/types'
 import ChoresToday from '../components/ChoresToday'
+import UndoToast from '../components/UndoToast'
+import { restore } from '../data/restore'
 
 const KINDS: { value: Chore['kind']; label: string }[] = [
   { value: 'diaria', label: 'Diária' },
@@ -28,6 +30,8 @@ export default function Tarefas() {
   const [kind, setKind] = useState<Chore['kind']>('diaria')
   const [weekday, setWeekday] = useState<Weekday>(6)
   const [error, setError] = useState('')
+  const [undo, setUndo] = useState<Chore | null>(null)
+  const closeUndo = useCallback(() => setUndo(null), [])
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -75,10 +79,11 @@ export default function Tarefas() {
                 {c.lastDoneKey && ` · feita por ${members[c.lastDoneBy ?? ''] ?? '?'}, ${when(c.lastDoneKey, today)}`}
               </div>
             </div>
-            <button className="link-btn" aria-label={`Apagar ${c.title}`} onClick={() => confirm(`Apagar «${c.title}»?`) && deleteChore(c.id)}>✕</button>
+            <button className="link-btn" aria-label={`Apagar ${c.title}`} onClick={() => { deleteChore(c.id); setUndo(c) }}>✕</button>
           </div>
         ))}
       </div>
+      {undo && <UndoToast message={`«${undo.title}» apagada`} onUndo={() => restore('chores', [undo])} onClose={closeUndo} />}
     </>
   )
 }

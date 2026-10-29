@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { stepsWithoutDays } from '../domain/routines'
 import { useCollection } from '../data/useCollection'
 import { useSession } from '../data/session'
 import { useToday } from '../hooks/useToday'
@@ -23,10 +24,14 @@ export default function RotinaEditar() {
   const navigate = useNavigate()
   const { uid, members } = useSession()
   const today = useToday()
-  const routine = useCollection<Routine>('routines').find(r => r.id === id)
+  const saved = useCollection<Routine>('routines').find(r => r.id === id)
+  const novo = (useLocation().state as { novo?: Routine } | null)?.novo
+  const isNew = !saved && novo?.id === id
+  const routine = saved ?? (isNew ? novo : undefined)
   const checks = useCollection<RoutineCheck>('routineChecks', ['routineId', '==', id])
   const checklists = useChecklistsOf(routine?.ownerUid ?? '')
   const [draft, setDraft] = useState<Routine | null>(null)
+  const [error, setError] = useState('')
   const editing = draft !== null
 
   if (!routine) return <p className="muted">A carregar…</p>
@@ -45,7 +50,9 @@ export default function RotinaEditar() {
       set({ steps })
     }
     const save = async () => {
-      saveRoutine({ ...draft, steps: draft.steps.filter(s => s.text.trim() && s.days.length) })
+      const noDays = stepsWithoutDays(draft.steps)
+      if (noDays.length) return setError(`Escolhe pelo menos um dia para: ${noDays.join(', ')}`)
+      saveRoutine({ ...draft, steps: draft.steps.filter(s => s.text.trim()) })
       setDraft(null)
       navigate(`/mais/rotinas/${id}`, { replace: true })
     }
@@ -88,11 +95,16 @@ export default function RotinaEditar() {
         ))}
         <button className="btn block" style={{ marginBottom: 10 }}
           onClick={() => set({ steps: [...draft.steps, { id: newId('steps'), text: '', period: 'manha', days: ALL_DAYS }] })}>+ Passo</button>
+        {error && <p className="error">{error}</p>}
         <button className="btn primary block" onClick={save}>Guardar</button>
         <div className="inline" style={{ justifyContent: 'space-between', marginTop: 8 }}>
-          <button className="link-btn" onClick={() => { setDraft(null); navigate(`/mais/rotinas/${id}`, { replace: true }) }}>Cancelar</button>
-          <button className="link-btn" style={{ color: 'var(--danger)' }}
-            onClick={async () => { if (confirm('Apagar esta rotina?')) { deleteRoutine(id); navigate('/mais/rotinas') } }}>Apagar rotina</button>
+          <button className="link-btn" onClick={() => {
+            setDraft(null)
+            if (isNew) navigate('/mais/rotinas', { replace: true })
+            else navigate(`/mais/rotinas/${id}`, { replace: true })
+          }}>Cancelar</button>
+          {!isNew && <button className="link-btn" style={{ color: 'var(--danger)' }}
+            onClick={async () => { if (confirm('Apagar esta rotina?')) { deleteRoutine(id); navigate('/mais/rotinas') } }}>Apagar rotina</button>}
         </div>
       </>
     )
