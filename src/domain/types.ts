@@ -1,6 +1,5 @@
 import type { DateKey, Weekday } from './dates'
 
-export type ProductState = 'ha' | 'aAcabar' | 'acabou'
 export type ShortageReason = 'acabou' | 'aAcabar'
 
 export interface ShoppingItem {
@@ -13,11 +12,19 @@ export interface ShoppingItem {
   createdAt?: unknown
 }
 
+/** Casa zone; also how the shopping list is grouped in the supermarket. */
+export type Zone = 'frigorifico' | 'despensa' | 'limpeza'
+
 export interface Product {
   id: string
   name: string
-  location: 'frigorifico' | 'despensa' | 'limpeza'
-  state: ProductState
+  location: Zone
+  /** purchase days, oldest first (last 8): the rhythm is learned from them */
+  boughtKeys?: DateKey[]
+  /** "Ainda há": not suggested before this day */
+  snoozedUntil?: DateKey
+  /** "Ainda há" taps since the last purchase */
+  snoozeCount?: number
 }
 
 export type FreezerUnit = 'un' | 'g' | 'kg' | 'doses'

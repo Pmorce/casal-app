@@ -6,7 +6,7 @@ const nid = () => `id${++n}`
 export const item = (p: Partial<ShoppingItem> = {}): ShoppingItem =>
   ({ id: nid(), text: 'Item', addedBy: 'P', status: 'porComprar', ...p })
 export const prod = (p: Partial<Product> = {}): Product =>
-  ({ id: nid(), name: 'Produto', location: 'despensa', state: 'ha', ...p })
+  ({ id: nid(), name: 'Produto', location: 'despensa', ...p })
 export const bag = (p: Partial<FreezerBag> = {}): FreezerBag =>
   ({ id: nid(), name: 'Bifes', category: 'carne', amount: 1, unit: 'un', addedKey: '2026-10-01', ...p })
 export const step = (p: Partial<Step> = {}): Step =>
