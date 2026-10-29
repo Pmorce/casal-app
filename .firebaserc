@@ -1,0 +1,6 @@
+{
+  "projects": {
+    "default": "demo-casa",
+    "prod": "app-casal-87db7"
+  }
+}

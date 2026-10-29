@@ -1,0 +1,18 @@
+import { normalize } from './shopping'
+import type { Product, ProductState, ShoppingItem, ShortageReason } from './types'
+
+export type PantryAction =
+  | { type: 'addItem'; text: string; productId: string; reason: ShortageReason }
+  | { type: 'setReason'; itemId: string; productId: string; reason: ShortageReason }
+  | { type: 'removeItem'; itemId: string }
+
+export function onProductStateChange(product: Product, next: ProductState, items: ShoppingItem[]): PantryAction[] {
+  const name = normalize(product.name)
+  const linked = items.find(i => i.productId === product.id)
+    ?? items.find(i => !i.productId && normalize(i.text) === name)
+  if (next === 'ha') {
+    return linked && linked.status === 'porComprar' ? [{ type: 'removeItem', itemId: linked.id }] : []
+  }
+  if (linked) return [{ type: 'setReason', itemId: linked.id, productId: product.id, reason: next }]
+  return [{ type: 'addItem', text: product.name, productId: product.id, reason: next }]
+}
