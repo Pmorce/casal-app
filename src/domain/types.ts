@@ -1,14 +1,15 @@
 import type { DateKey, Weekday } from './dates'
 
-export type ShortageReason = 'acabou' | 'aAcabar'
 
 export interface ShoppingItem {
   id: string
   text: string
   addedBy: string
   status: 'porComprar' | 'carrinho'
+  /** the Casa product it stands for; missing on "só desta vez" items (and legacy ones) */
   productId?: string
-  reason?: ShortageReason
+  /** "Só desta vez": bought once, never becomes a Casa product */
+  oneOff?: true
   createdAt?: unknown
 }
 
