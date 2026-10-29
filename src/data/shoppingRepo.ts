@@ -84,6 +84,16 @@ export function addProduct(name: string, location: Product['location'], products
 
 export const deleteItem = (id: string) => fire(deleteDoc(doc(db, 'shopping', id)))
 
+/** Rename keeps the list in step: items linked to the product show the new name. */
+export function renameProduct(p: Product, name: string, items: ShoppingItem[]): void {
+  const batch = writeBatch(db)
+  batch.update(doc(db, 'products', p.id), { name })
+  items.filter(i => i.productId === p.id).forEach(i => batch.update(doc(db, 'shopping', i.id), { text: name }))
+  fire(batch.commit())
+}
+
+export const moveProduct = (p: Product, location: Product['location']) => fire(updateDoc(doc(db, 'products', p.id), { location }))
+
 /** Deletes the product and the item it left on the list; returns both so the UI can undo. */
 export function deleteProduct(p: Product, items: ShoppingItem[]): { product: Product; items: ShoppingItem[] } {
   const linked = itemsOfProduct(p.id, items)

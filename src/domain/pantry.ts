@@ -1,4 +1,4 @@
-import { normalize } from './shopping'
+import { cleanText, normalize } from './shopping'
 import type { Product, ProductState, ShoppingItem, ShortageReason } from './types'
 
 export type PantryAction =
@@ -26,4 +26,12 @@ export function itemsOfProduct(productId: string, items: ShoppingItem[]): Shoppi
 export function needsSync(product: Product, next: ProductState, items: ShoppingItem[]): boolean {
   if (product.state !== next) return true
   return next !== 'ha' && !items.some(i => i.productId === product.id)
+}
+
+/** New name for a Casa product: trimmed, not blank, and not the name of another product. */
+export function checkRename(product: Product, name: string, products: Product[]): { ok: string } | { error: string } {
+  const clean = cleanText(name)
+  if (!clean) return { error: 'Falta o nome' }
+  const other = products.find(p => p.id !== product.id && normalize(p.name) === normalize(clean))
+  return other ? { error: `Já existe «${other.name}»` } : { ok: clean }
 }

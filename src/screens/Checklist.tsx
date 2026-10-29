@@ -4,6 +4,7 @@ import { useCollection } from '../data/useCollection'
 import { useSession } from '../data/session'
 import { clearChecklist, deleteChecklist, newId, saveChecklist, toggleChecklistItem } from '../data/routinesRepo'
 import type { Checklist as ChecklistT, Routine } from '../domain/types'
+import { useUnsavedChanges } from '../hooks/useUnsavedChanges'
 
 /** Reusable checklist (e.g. packing a bag): tick while packing, "Limpar" to start over. Owner-only edits. */
 export default function Checklist() {
@@ -18,6 +19,7 @@ export default function Checklist() {
   const myRoutines = useCollection<Routine>('routines', ['ownerUid', '==', uid])
   const [draft, setDraft] = useState<ChecklistT | null>(null)
   const [newItem, setNewItem] = useState('')
+  useUnsavedChanges(draft !== null && (isNew || newItem.trim() !== '' || JSON.stringify(draft) !== JSON.stringify(list)))
 
   if (!list) return <p className="muted">A carregar…</p>
   const mine = list.ownerUid === uid

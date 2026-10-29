@@ -16,7 +16,7 @@ export interface ShoppingItem {
 export interface Product {
   id: string
   name: string
-  location: 'frigorifico' | 'despensa'
+  location: 'frigorifico' | 'despensa' | 'limpeza'
   state: ProductState
 }
 

@@ -1,4 +1,4 @@
-import { itemsOfProduct, needsSync, onProductStateChange } from './pantry'
+import { checkRename, itemsOfProduct, needsSync, onProductStateChange } from './pantry'
 import { item, prod } from './testFactories'
 
 test('running low adds the product to the list', () => {
@@ -40,4 +40,13 @@ test('tapping the current state again re-adds a product that was taken off the l
   expect(needsSync(p, 'acabou', [item({ productId: 'p1' })])).toBe(false)
   expect(needsSync(prod({ state: 'ha' }), 'ha', [])).toBe(false)
   expect(needsSync(p, 'ha', [])).toBe(true)
+})
+
+test('renaming checks for blanks and for another product with the same name', () => {
+  const leite = prod({ id: 'p1', name: 'Leite' })
+  const all = [leite, prod({ id: 'p2', name: 'Café' })]
+  expect(checkRename(leite, '  Leite  meio-gordo ', all)).toEqual({ ok: 'Leite meio-gordo' })
+  expect(checkRename(leite, 'cafe', all)).toEqual({ error: 'Já existe «Café»' })
+  expect(checkRename(leite, '  ', all)).toEqual({ error: 'Falta o nome' })
+  expect(checkRename(leite, 'LEITE', all)).toEqual({ ok: 'LEITE' })
 })

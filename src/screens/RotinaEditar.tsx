@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { stepsWithoutDays } from '../domain/routines'
+import { useUnsavedChanges } from '../hooks/useUnsavedChanges'
 import { useCollection } from '../data/useCollection'
 import { useSession } from '../data/session'
 import { useToday } from '../hooks/useToday'
@@ -33,6 +34,7 @@ export default function RotinaEditar() {
   const [draft, setDraft] = useState<Routine | null>(null)
   const [error, setError] = useState('')
   const editing = draft !== null
+  useUnsavedChanges(draft !== null && (isNew || JSON.stringify(draft) !== JSON.stringify(routine)))
 
   if (!routine) return <p className="muted">A carregar…</p>
   const mine = routine.ownerUid === uid
