@@ -63,6 +63,9 @@ describe('stockStatus for Congelador products counts bags', () => {
     expect(stockStatus({ ...p, boughtKeys: undefined }, [], '2026-10-29', [])).toBe('ha')
     expect(stockStatus({ ...p, snoozedUntil: '2026-11-05' }, [], '2026-10-29', [])).toBe('ha')
   })
+  test('bought today with its bags not entered yet → not talvez (the freezer card is still open)', () => {
+    expect(stockStatus({ ...p, boughtKeys: ['2026-10-01', '2026-10-29'] }, [], '2026-10-29', [])).toBe('ha')
+  })
   test('snooze without a rhythm lasts 7 days', () => {
     expect(snoozeUntil(p, '2026-10-29')).toBe('2026-11-05')
   })

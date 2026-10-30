@@ -143,7 +143,7 @@ export default function Casa() {
       <form className="card" onSubmit={submit}>
         <div className="card-title">+ Produto</div>
         <input className="input" placeholder="Nome (ex.: Leite)" value={name} onChange={e => { setName(e.target.value); setMsg('') }} />
-        <div className="seg" style={{ marginTop: 8 }}>
+        <div className="seg compact" style={{ marginTop: 8 }}>
           {ZONES.map(z => (
             <button type="button" key={z.value} className={location === z.value ? 'on' : ''} onClick={() => setLocation(z.value)}>{z.short}</button>
           ))}

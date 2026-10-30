@@ -170,4 +170,50 @@ export default {
     await shot(a.page, 'comprei-after')
     await expectText(a.page, '🟢 Há', 'Casa still on screen after registering')
   },
+
+  // Congelador round: Terminar compras → Para o congelador (on screen) → Quanto foi → Dividir; no page errors.
+  async congeladorCompras({ login, shot, expectText }) {
+    await (await import('./ui-admin.mjs')).resetDb()
+    const { page } = await login('ana')
+    const errors = []
+    page.on('pageerror', e => errors.push(e.message))
+    const base = page.url().split('#')[0]
+    await page.goto(base + '#/casa')
+    await page.getByPlaceholder('Nome (ex.: Leite)').fill('Carne de vaca')
+    await page.getByRole('button', { name: 'Congelador' }).click()
+    await page.getByRole('button', { name: 'Adicionar' }).click()
+    await page.getByRole('button', { name: 'Falta Carne de vaca' }).click()
+
+    await page.goto(base + '#/compras')
+    await page.getByRole('button', { name: 'Carne de vaca', exact: true }).click()
+    await page.getByRole('button', { name: /Terminar compras/ }).click()
+    await page.waitForTimeout(700)
+    const box = await page.getByText('Para o congelador').boundingBox()
+    if (!box || box.y < 0 || box.y > 844) throw new Error(`"Para o congelador" off-screen: ${JSON.stringify(box)}`)
+    console.log('ok: Para o congelador on screen')
+    await shot(page, 'cc-1-congelador')
+    await page.getByLabel('Quantidade de Carne de vaca').fill('5')
+    await page.getByRole('button', { name: 'Guardar' }).click()
+    await expectText(page, 'Quanto foi', 'then Quanto foi')
+    await shot(page, 'cc-2-quanto-foi')
+    await page.getByRole('button', { name: 'Agora não' }).click()
+
+    await page.goto(base + '#/congelador')
+    await expectText(page, '1 saco · 5 kg', 'one bag of 5 kg in the freezer')
+    await page.getByText('Carne de vaca').click()
+    await page.getByRole('button', { name: 'Dividir', exact: true }).click()
+    await page.getByRole('button', { name: 'Dividir em 5' }).click()
+    await expectText(page, '5 sacos · 5 kg', 'split in 5 bags')
+    await shot(page, 'cc-3-dividido')
+
+    await page.goto(base + '#/casa')
+    await expectText(page, '5 sacos · 5 kg', 'Casa shows the bags')
+    await shot(page, 'cc-4-casa')
+    await page.goto(base + '#/compras')
+    await page.getByPlaceholder('+ Adicionar (ex.: Leite)').fill('Pilhas')
+    await page.getByRole('button', { name: 'Adicionar' }).click()
+    await expectText(page, 'Onde fica', 'zone picker for a new name')
+    await shot(page, 'cc-5-zonas')
+    if (errors.length) throw new Error(`page errors: ${errors.join(' | ')}`)
+  },
 }

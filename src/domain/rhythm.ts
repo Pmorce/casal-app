@@ -43,7 +43,9 @@ export function isHeld(p: Product, today: DateKey): boolean {
  * but only for products the app has seen bought (few, right suggestions).
  */
 export function freezerDue(p: Product, bags: FreezerBag[], today: DateKey): boolean {
-  return p.location === 'congelador' && !!p.boughtKeys?.length && !bagsOfProduct(p, bags).length && !isHeld(p, today)
+  const last = p.boughtKeys?.[p.boughtKeys.length - 1]
+  // bought today: its bags may still be on their way in (the "Para o congelador" card)
+  return p.location === 'congelador' && last !== undefined && last < today && !bagsOfProduct(p, bags).length && !isHeld(p, today)
 }
 
 export function snoozeUntil(p: Product, today: DateKey): DateKey {
