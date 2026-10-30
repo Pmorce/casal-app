@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { collection, onSnapshot, type QuerySnapshot } from 'firebase/firestore'
+import { collection, onSnapshot, onSnapshotsInSync, type QuerySnapshot } from 'firebase/firestore'
 import { db } from '../data/firebase'
 import { applyTidy } from '../data/tidyRepo'
 import { tidyPlan } from '../domain/tidy'
@@ -9,6 +9,8 @@ import type { FreezerBag, Product, ShoppingItem } from '../domain/types'
  * Background tidy-up of what two offline phones leave behind (duplicate products, stale names…).
  * Runs only on server-confirmed data while online, so both phones plan from the same truth; our own
  * writes make the next snapshots pending, which keeps it from repeating while they round-trip.
+ * Planning waits for onSnapshotsInSync: one server change (e.g. a rename batch) reaches the three
+ * listeners one after another, and planning in between would see a mix of old and new versions.
  */
 export function useTidyUp(): void {
   useEffect(() => {
@@ -26,11 +28,10 @@ export function useTidyUp(): void {
       (snap: QuerySnapshot) => {
         docs[name] = snap.docs.map(d => ({ ...d.data(), id: d.id }))
         fresh[name] = !snap.metadata.fromCache && !snap.metadata.hasPendingWrites
-        check()
       },
       err => console.error(`useTidyUp(${name})`, err),
     )
-    const stops = Object.keys(docs).map(listen)
+    const stops = [...Object.keys(docs).map(listen), onSnapshotsInSync(db, check)]
     return () => stops.forEach(stop => stop())
   }, [])
 }
