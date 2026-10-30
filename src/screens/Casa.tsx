@@ -123,7 +123,7 @@ export default function Casa() {
                       {p.name} <span className="zone-tag">{ZONE_SHORT[p.location]}</span>
                       <div className="note">
                         {p.location === 'congelador' ? freezerNote(p, bags, st.value) : st.value === 'talvez' ? lateNote(p, today) : rhythmNote(p, today)}
-                        {(p.snoozeCount ?? 0) >= MAX_SNOOZES && ' · não sugiro até voltarem a comprar'}
+                        {st.value === 'ha' && (p.snoozeCount ?? 0) >= MAX_SNOOZES && ' · não sugiro até voltarem a comprar'}
                       </div>
                     </div>
                     {st.value !== 'falta' && (

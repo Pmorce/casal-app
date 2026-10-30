@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import Congelador from './Congelador'
-import { bag, prod } from '../domain/testFactories'
+import { bag, item, prod } from '../domain/testFactories'
 import type { FreezerBag, Product, ShoppingItem } from '../domain/types'
 
 const data = vi.hoisted(() => ({ shopping: [] as ShoppingItem[], products: [] as Product[], bags: [] as FreezerBag[] }))
@@ -181,4 +181,17 @@ test('if the split is refused, it says so instead of doing nothing', () => {
   openSplit('Vaca')
   fireEvent.click(screen.getByRole('button', { name: 'Dividir em 2' }))
   expect(screen.getByText('Não foi possível dividir: Quantidade inválida')).toBeTruthy()
+})
+
+test('"Pôr na lista" uses the list as it is now, not as it was when the bag was taken out', () => {
+  const v = prod({ id: 'v', name: 'Vaca', location: 'congelador' })
+  data.products = [v]
+  data.bags = [bag({ name: 'Vaca', productId: 'v' })]
+  const { rerender } = renderIt()
+  fireEvent.click(screen.getByRole('button', { name: 'Tirar um saco de Vaca' }))
+  const added = item({ text: 'Vaca', productId: 'v' })
+  data.shopping = [added] // the other phone tapped "Falta" meanwhile
+  rerender(<MemoryRouter><Congelador /></MemoryRouter>)
+  fireEvent.click(screen.getByRole('button', { name: 'Pôr na lista' }))
+  expect(shop.markMissing).toHaveBeenCalledWith(v, 'P', [added])
 })

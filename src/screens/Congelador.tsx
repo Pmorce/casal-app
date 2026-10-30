@@ -33,12 +33,12 @@ export default function Congelador() {
   const [category, setCategory] = useState<FreezerBag['category']>('carne')
   const [adding, setAdding] = useState(false)
   const [open, setOpen] = useState<string | null>(null)
-  const [undo, setUndo] = useState<{
-    message: string; run: () => void; action?: { label: string; run: () => void }; dismiss?: () => void
-  } | null>(null)
+  // `ended`: the group whose last bag was taken out; its question is answered with the list as it is then (render time)
+  const [undo, setUndo] = useState<{ message: string; run: () => void; ended?: FreezerGroup } | null>(null)
   const [fixing, setFixing] = useState<string | null>(null)
   const [splitting, setSplitting] = useState<string | null>(null)
   const closeUndo = useCallback(() => setUndo(null), [])
+  const ended = undo?.ended
 
   const groups = groupBags(bags).filter(g => g.category === category)
   const names = [...new Set(bags.map(b => b.name))]
@@ -48,12 +48,7 @@ export default function Congelador() {
     const bag = removeOldest(g)
     if (!wasLast) return setUndo({ message: 'Saco retirado', run: () => restoreBag(bag) })
     // the last one: asked at the bottom of the screen, always in view (a card at the top was missed)
-    setUndo({
-      message: `Acabou ${g.name}`,
-      run: () => restoreBag(bag),
-      action: { label: 'Pôr na lista', run: () => answerList(g, true) },
-      dismiss: () => answerList(g, false),
-    })
+    setUndo({ message: `Acabou ${g.name}`, run: () => restoreBag(bag), ended: g })
   }
 
   /** The Casa product the group stands for: linked by its bags, else one with the same name. */
@@ -128,7 +123,11 @@ export default function Congelador() {
         )
       })}
 
-      {undo && <UndoToast message={undo.message} onUndo={undo.run} onClose={closeUndo} action={undo.action} onDismiss={undo.dismiss} />}
+      {undo && (
+        <UndoToast message={undo.message} onUndo={undo.run} onClose={closeUndo}
+          action={ended && { label: 'Pôr na lista', run: () => answerList(ended, true) }}
+          onDismiss={ended && (() => answerList(ended, false))} />
+      )}
     </>
   )
 }

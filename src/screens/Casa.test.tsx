@@ -157,3 +157,10 @@ test('the usual duration is shown in whole days', () => {
   expect(screen.getByText(/dura ~8 dias/)).toBeTruthy()
   expect(screen.queryByText(/7[.,]5/)).toBeNull()
 })
+
+test('a product snoozed 3 times but now on the list does not say "não sugiro"', () => {
+  data.products = [prod({ id: 'c', name: 'Café', boughtKeys: ['2026-09-01', '2026-09-11', '2026-09-21'], snoozeCount: 3 })]
+  data.shopping = [item({ productId: 'c' })]
+  renderIt()
+  expect(screen.queryByText(/não sugiro/)).toBeNull()
+})
