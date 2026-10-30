@@ -11,6 +11,12 @@ export interface FreezerGroup {
   bags: FreezerBag[]
 }
 
+export const CATEGORIES: { value: FreezerCategory; label: string }[] = [
+  { value: 'carne', label: 'Carne / peixe' },
+  { value: 'feita', label: 'Comida feita' },
+  { value: 'outros', label: 'Outros' },
+]
+
 const OLD_AFTER_DAYS = 90
 const num = new Intl.NumberFormat('pt-PT', { maximumFractionDigits: 2 })
 

@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { addBags } from '../data/freezerRepo'
-import { parseAmount } from '../domain/freezer'
+import { CATEGORIES, parseAmount } from '../domain/freezer'
 import type { DateKey } from '../domain/dates'
 import type { FreezerBag } from '../domain/types'
 
@@ -39,8 +39,9 @@ export default function NovoSaco({ category: initialCategory, names, today, onDo
     <form className="card" onSubmit={submit}>
       <div className="card-title">Novo saco <button type="button" className="link-btn" onClick={onDone}>Cancelar</button></div>
       <div className="seg">
-        <button type="button" className={category === 'carne' ? 'on' : ''} onClick={() => setCategory('carne')}>Carne / peixe</button>
-        <button type="button" className={category === 'feita' ? 'on' : ''} onClick={() => setCategory('feita')}>Comida feita</button>
+        {CATEGORIES.map(c => (
+          <button type="button" key={c.value} className={category === c.value ? 'on' : ''} onClick={() => setCategory(c.value)}>{c.label}</button>
+        ))}
       </div>
       <label className="field">
         <span>O que é</span>

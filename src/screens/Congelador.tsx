@@ -2,10 +2,11 @@ import { useCallback, useState, type FormEvent } from 'react'
 import { useCollection } from '../data/useCollection'
 import { useSession } from '../data/session'
 import { useToday } from '../hooks/useToday'
-import { addSameAsLast, deleteBag, removeOldest, restoreBag, updateBag } from '../data/freezerRepo'
-import { addItem } from '../data/shoppingRepo'
+import { addSameAsLast, deleteBag, deleteBags, removeOldest, restoreBag, splitBag, updateBag } from '../data/freezerRepo'
+import { addItem, markMissing, snooze } from '../data/shoppingRepo'
 import { guessZone } from '../domain/zones'
-import { groupBags, isOld, parseAmount, summary, type FreezerGroup } from '../domain/freezer'
+import { findProduct } from '../domain/shopping'
+import { CATEGORIES, groupBags, isOld, parseAmount, splitAmounts, summary, type FreezerGroup } from '../domain/freezer'
 import { daysBetween, type DateKey } from '../domain/dates'
 import type { FreezerBag, Product, ShoppingItem } from '../domain/types'
 import UndoToast from '../components/UndoToast'
@@ -13,6 +14,7 @@ import NovoSaco from './NovoSaco'
 
 const num = new Intl.NumberFormat('pt-PT', { maximumFractionDigits: 2 })
 const UNIT_LABEL = { un: 'un.', g: 'g', kg: 'kg', doses: 'doses' } as const
+const ptNum = (n: number) => num.format(n).replace(/\s/g, '')
 
 function age(addedKey: string, today: string): string {
   const days = daysBetween(addedKey, today)
@@ -31,34 +33,59 @@ export default function Congelador() {
   const [category, setCategory] = useState<FreezerBag['category']>('carne')
   const [adding, setAdding] = useState(false)
   const [open, setOpen] = useState<string | null>(null)
-  const [undo, setUndo] = useState<{ bag: FreezerBag; message: string } | null>(null)
-  const [askList, setAskList] = useState<string | null>(null)
+  const [undo, setUndo] = useState<{ message: string; run: () => void } | null>(null)
+  const [askList, setAskList] = useState<FreezerGroup | null>(null)
   const [fixing, setFixing] = useState<string | null>(null)
+  const [splitting, setSplitting] = useState<string | null>(null)
   const closeUndo = useCallback(() => setUndo(null), [])
 
   const groups = groupBags(bags).filter(g => g.category === category)
   const names = [...new Set(bags.map(b => b.name))]
 
-  async function minus(g: FreezerGroup) {
+  function minus(g: FreezerGroup) {
     const wasLast = g.bags.length === 1
-    setUndo({ bag: removeOldest(g), message: 'Saco retirado' })
-    if (wasLast) setAskList(g.name)
+    const bag = removeOldest(g)
+    setUndo({ message: 'Saco retirado', run: () => { restoreBag(bag); setAskList(null) } })
+    if (wasLast) setAskList(g)
+  }
+
+  /** The Casa product the group stands for: linked by its bags, else one with the same name. */
+  function productOf(g: FreezerGroup): Product | undefined {
+    const linked = g.bags.find(b => b.productId)?.productId
+    return products.find(p => p.id === linked) ?? findProduct(g.name, products)
+  }
+
+  function answerList(yes: boolean) {
+    if (!askList) return
+    const product = productOf(askList)
+    if (yes && product) markMissing(product, uid, items)
+    else if (yes) addItem(askList.name, uid, products, items, guessZone(askList.name))
+    // "Não" on a Congelador product means "ainda há": its "Talvez falte" waits a while
+    else if (product?.location === 'congelador') snooze(product, today)
+    setAskList(null)
+  }
+
+  function split(b: FreezerBag, amounts: number[]) {
+    const ids = splitBag(b, amounts)
+    setSplitting(null)
+    setUndo({ message: `Saco dividido em ${amounts.length}`, run: () => { deleteBags(ids); restoreBag(b) } })
   }
 
   return (
     <>
       <h1>Congelador</h1>
       <div className="seg">
-        <button className={category === 'carne' ? 'on' : ''} onClick={() => setCategory('carne')}>Carne / peixe</button>
-        <button className={category === 'feita' ? 'on' : ''} onClick={() => setCategory('feita')}>Comida feita</button>
+        {CATEGORIES.map(c => (
+          <button key={c.value} className={category === c.value ? 'on' : ''} onClick={() => setCategory(c.value)}>{c.label}</button>
+        ))}
       </div>
 
       {askList && (
         <div className="card">
-          <div>Acabou <strong>{askList}</strong>. Adicionar à lista de compras?</div>
+          <div>Acabou <strong>{askList.name}</strong>. Adicionar à lista de compras?</div>
           <div className="inline" style={{ marginTop: 8 }}>
-            <button className="btn primary" onClick={() => { addItem(askList, uid, products, items, guessZone(askList)); setAskList(null) }}>Sim</button>
-            <button className="btn" onClick={() => setAskList(null)}>Não</button>
+            <button className="btn primary" onClick={() => answerList(true)}>Sim</button>
+            <button className="btn" onClick={() => answerList(false)}>Não</button>
           </div>
         </div>
       )}
@@ -85,19 +112,59 @@ export default function Congelador() {
             </div>
             {open === g.key && g.bags.map(b => fixing === b.id ? (
               <FixBag key={b.id} bag={b} today={today} onDone={() => setFixing(null)} />
+            ) : splitting === b.id ? (
+              <SplitBag key={b.id} bag={b} onSplit={amounts => split(b, amounts)} onCancel={() => setSplitting(null)} />
             ) : (
               <div className="row small" key={b.id}>
                 <span className="grow">{num.format(b.amount)} {UNIT_LABEL[b.unit]} · entrou {age(b.addedKey, today)}</span>
-                <button className="link-btn" onClick={() => setFixing(b.id)}>Corrigir</button>
-                <button className="link-btn" onClick={() => { deleteBag(b.id); setUndo({ bag: b, message: 'Saco apagado' }) }}>Apagar</button>
+                <button className="link-btn" onClick={() => { setSplitting(null); setFixing(b.id) }}>Corrigir</button>
+                <button className="link-btn" onClick={() => { setFixing(null); setSplitting(b.id) }}>Dividir</button>
+                <button className="link-btn" onClick={() => { deleteBag(b.id); setUndo({ message: 'Saco apagado', run: () => restoreBag(b) }) }}>Apagar</button>
               </div>
             ))}
           </div>
         )
       })}
 
-      {undo && <UndoToast message={undo.message} onUndo={() => { restoreBag(undo.bag); setAskList(null) }} onClose={closeUndo} />}
+      {undo && <UndoToast message={undo.message} onUndo={undo.run} onClose={closeUndo} />}
     </>
+  )
+}
+
+/** "Dividir": when the pack is split at home. Equal parts by default (total kept exact); the amount can be typed. */
+function SplitBag({ bag, onSplit, onCancel }: { bag: FreezerBag; onSplit: (amounts: number[]) => void; onCancel: () => void }) {
+  const whole = Number.isInteger(bag.amount) && bag.amount > 1 && bag.amount <= 20
+  const [count, setCount] = useState(whole ? bag.amount : 2)
+  // null = untouched: follows the count, and the last bag takes the rounding
+  const [typed, setTyped] = useState<string | null>(null)
+  const [error, setError] = useState('')
+  const parts = splitAmounts(bag.amount, count)
+
+  function save(e: FormEvent) {
+    e.preventDefault()
+    if (typed === null) return onSplit(parts)
+    const n = parseAmount(typed)
+    if (n === null) return setError('Quantidade inválida')
+    onSplit(Array.from({ length: count }, () => n))
+  }
+
+  return (
+    <form className="small" onSubmit={save} style={{ padding: '6px 0' }}>
+      <div className="inline" style={{ alignItems: 'center' }}>
+        <button type="button" className="icon-btn" aria-label="Menos sacos" onClick={() => setCount(Math.max(2, count - 1))}>−</button>
+        <strong style={{ minWidth: 24, textAlign: 'center' }}>{count}</strong>
+        <button type="button" className="icon-btn" aria-label="Mais sacos" onClick={() => setCount(Math.min(20, count + 1))}>+</button>
+        <span>sacos de</span>
+        <input className="input" inputMode="decimal" aria-label="Quantidade por saco" value={typed ?? ptNum(parts[0])}
+          onChange={e => { setTyped(e.target.value); setError('') }} style={{ flex: 1, minWidth: 0 }} />
+        <span>{UNIT_LABEL[bag.unit]}</span>
+      </div>
+      {error && <p className="error">{error}</p>}
+      <div className="inline" style={{ justifyContent: 'flex-end' }}>
+        <button type="button" className="link-btn" onClick={onCancel}>Cancelar</button>
+        <button className="btn primary small">Dividir em {count}</button>
+      </div>
+    </form>
   )
 }
 
