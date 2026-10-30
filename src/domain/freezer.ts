@@ -1,6 +1,7 @@
 import { daysBetween, type DateKey } from './dates'
 import { normalize } from './shopping'
-import type { FreezerBag, FreezerCategory } from './types'
+import { freezerCategoryOf } from './zones'
+import type { FreezerBag, FreezerCategory, FreezerUnit, Product, ShoppingItem } from './types'
 
 export interface FreezerGroup {
   key: string
@@ -33,10 +34,12 @@ export function groupBags(bags: FreezerBag[]): FreezerGroup[] {
   return groups.sort((a, b) => a.name.localeCompare(b.name, 'pt-PT'))
 }
 
-export function summary(g: FreezerGroup): string {
-  const count = g.bags.length
+export const summary = (g: FreezerGroup): string => bagsSummary(g.bags)
+
+export function bagsSummary(bags: FreezerBag[]): string {
+  const count = bags.length
   let un = 0, grams = 0, doses = 0
-  for (const b of g.bags) {
+  for (const b of bags) {
     if (b.unit === 'un') un += b.amount
     else if (b.unit === 'g') grams += b.amount
     else if (b.unit === 'kg') grams += b.amount * 1000
@@ -55,4 +58,32 @@ export function oldestBag(g: FreezerGroup): FreezerBag {
 
 export function isOld(bag: FreezerBag, today: DateKey): boolean {
   return daysBetween(bag.addedKey, today) > OLD_AFTER_DAYS
+}
+
+/** A product's bags: the ones linked to it, plus legacy unlinked bags with its name in its freezer tab. */
+export function bagsOfProduct(p: Product, bags: FreezerBag[]): FreezerBag[] {
+  const name = normalize(p.name)
+  const category = freezerCategoryOf(p)
+  return bags.filter(b => b.productId === p.id || (!b.productId && b.category === category && normalize(b.name) === name))
+}
+
+const round2 = (n: number) => Math.round(n * 100) / 100
+
+/** "Dividir": equal parts with 2 decimals; the last one takes the rounding so the total stays exact. */
+export function splitAmounts(total: number, count: number): number[] {
+  const part = round2(total / count)
+  const parts = Array.from({ length: count - 1 }, () => part)
+  return [...parts, round2(total - part * (count - 1))]
+}
+
+/** What the "Para o congelador" row starts with: the last entry, else kg for meat and units for the rest. */
+export function freezeDefaults(p: Product): { amount: string; unit: FreezerUnit } {
+  if (p.freezerLast) return { amount: num.format(p.freezerLast.amount).replace(/s/g, ''), unit: p.freezerLast.unit }
+  return { amount: '', unit: freezerCategoryOf(p) === 'carne' ? 'kg' : 'un' }
+}
+
+/** Congelador products in the cart, once each: what "Terminar compras" offers to put in the freezer. */
+export function freezerInCart(items: ShoppingItem[], products: Product[]): Product[] {
+  const ids = new Set(items.filter(i => i.status === 'carrinho' && i.productId).map(i => i.productId))
+  return products.filter(p => p.location === 'congelador' && ids.has(p.id)).sort((a, b) => a.name.localeCompare(b.name, 'pt-PT'))
 }

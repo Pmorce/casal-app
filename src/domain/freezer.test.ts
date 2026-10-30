@@ -1,5 +1,5 @@
-import { parseAmount, summary, groupBags, oldestBag, isOld } from './freezer'
-import { bag } from './testFactories'
+import { parseAmount, summary, groupBags, oldestBag, isOld, bagsOfProduct, splitAmounts, freezeDefaults, freezerInCart } from './freezer'
+import { bag, item, prod } from './testFactories'
 
 const group = (bags: ReturnType<typeof bag>[]) => groupBags(bags)[0]
 
@@ -42,4 +42,29 @@ test('isOld after more than 90 days', () => {
 test('groupBags merges names ignoring case/spaces but keeps categories apart', () => {
   expect(groupBags([bag({ name: 'Bifes de frango', category: 'carne' }), bag({ name: 'bifes de frango ', category: 'carne' })])).toHaveLength(1)
   expect(groupBags([bag({ name: 'Arroz', category: 'carne' }), bag({ name: 'Arroz', category: 'feita' })])).toHaveLength(2)
+})
+
+test('bagsOfProduct: linked bags, plus legacy bags with the same name in the same category only', () => {
+  const p = prod({ id: 'p', name: 'Arroz', location: 'congelador', freezerCategory: 'outros' })
+  const bags = [bag({ productId: 'p', name: 'Outro nome' }), bag({ name: ' arroz', category: 'outros' }),
+    bag({ name: 'Arroz', category: 'feita' }), bag({ name: 'Arroz', category: 'outros', productId: 'x' })]
+  expect(bagsOfProduct(p, bags)).toHaveLength(2)
+})
+
+test('splitAmounts keeps the total exact with 2 decimals', () => {
+  expect(splitAmounts(5, 5)).toEqual([1, 1, 1, 1, 1])
+  expect(splitAmounts(1, 3)).toEqual([0.33, 0.33, 0.34])
+  expect(splitAmounts(2, 3)).toEqual([0.67, 0.67, 0.66])
+})
+
+test('freezeDefaults uses the last entry, else kg for meat and un. for the rest', () => {
+  expect(freezeDefaults(prod({ name: 'Vaca', location: 'congelador', freezerLast: { amount: 2.5, unit: 'kg' } }))).toEqual({ amount: '2,5', unit: 'kg' })
+  expect(freezeDefaults(prod({ name: 'Vaca', location: 'congelador' }))).toEqual({ amount: '', unit: 'kg' })
+  expect(freezeDefaults(prod({ name: 'Gelado', location: 'congelador' }))).toEqual({ amount: '', unit: 'un' })
+})
+
+test('freezerInCart lists Congelador products in the cart, once', () => {
+  const products = [prod({ id: 'c', location: 'congelador' }), prod({ id: 'd', location: 'despensa' })]
+  const items = [item({ status: 'carrinho', productId: 'c' }), item({ status: 'carrinho', productId: 'd' }), item({ status: 'porComprar', productId: 'c' }), item({ status: 'carrinho', productId: 'c' })]
+  expect(freezerInCart(items, products).map(p => p.id)).toEqual(['c'])
 })

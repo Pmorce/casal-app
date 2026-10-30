@@ -118,16 +118,19 @@ export default function Compras() {
       {missing.length > 0 && (
         <div className="card">
           <div className="card-title">Talvez falte <span className="pill">{missing.length}</span></div>
-          {missing.map(({ product, gap, since }) => (
+          {missing.map(m => {
+            const { product } = m
+            return (
             <div className="row" key={product.id}>
               <div className="grow">
                 {product.name}
-                <div className="note">costuma durar ~{gap} dias · vai em {since}</div>
+                <div className="note">{m.reason === 'congelador' ? 'não há no congelador' : `costuma durar ~${m.gap} dias · vai em ${m.since}`}</div>
               </div>
               <button className="btn small primary" onClick={() => markMissing(product, uid, items)}>Falta</button>
               <button className="btn small" onClick={() => snooze(product, today)}>Ainda há</button>
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
 

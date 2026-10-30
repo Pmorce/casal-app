@@ -1,5 +1,6 @@
 import { addDays, daysBetween, type DateKey } from './dates'
-import type { Product, ShoppingItem } from './types'
+import { bagsOfProduct } from './freezer'
+import type { FreezerBag, Product, ShoppingItem } from './types'
 
 const KEEP = 8
 /** after this many "Ainda há" with no purchase, stop suggesting until the next purchase */
@@ -29,19 +30,32 @@ export function rhythmOf(p: Product, today: DateKey): { gap: number | null; sinc
   if (gap === null || since === null) return { gap, since, due: false }
   const margin = keys.length === 2 ? 1.5 : 1.2
   const late = since >= Math.max(gap * margin, gap + 2)
-  const held = (p.snoozedUntil !== undefined && p.snoozedUntil > today) || (p.snoozeCount ?? 0) >= MAX_SNOOZES
-  return { gap, since, due: late && !held }
+  return { gap, since, due: late && !isHeld(p, today) }
+}
+
+/** "Ainda há" said recently, or too many times since the last purchase. */
+export function isHeld(p: Product, today: DateKey): boolean {
+  return (p.snoozedUntil !== undefined && p.snoozedUntil > today) || (p.snoozeCount ?? 0) >= MAX_SNOOZES
+}
+
+/**
+ * Congelador products are known by their bags, not guessed by rhythm: none left means probably out —
+ * but only for products the app has seen bought (few, right suggestions).
+ */
+export function freezerDue(p: Product, bags: FreezerBag[], today: DateKey): boolean {
+  return p.location === 'congelador' && !!p.boughtKeys?.length && !bagsOfProduct(p, bags).length && !isHeld(p, today)
 }
 
 export function snoozeUntil(p: Product, today: DateKey): DateKey {
   const gap = typicalGap(p.boughtKeys)
-  return addDays(today, Math.max(2, Math.round((gap ?? 0) / 3)))
+  return addDays(today, gap === null ? 7 : Math.max(2, Math.round(gap / 3)))
 }
 
 /** What Casa shows at a glance, without counting stock: on the list, probably out (past its rhythm), or there. */
 export type StockStatus = 'falta' | 'talvez' | 'ha'
 
-export function stockStatus(p: Product, items: ShoppingItem[], today: DateKey): StockStatus {
+export function stockStatus(p: Product, items: ShoppingItem[], today: DateKey, bags: FreezerBag[] = []): StockStatus {
   if (items.some(i => i.productId === p.id)) return 'falta'
-  return rhythmOf(p, today).due ? 'talvez' : 'ha'
+  const due = p.location === 'congelador' ? freezerDue(p, bags, today) : rhythmOf(p, today).due
+  return due ? 'talvez' : 'ha'
 }

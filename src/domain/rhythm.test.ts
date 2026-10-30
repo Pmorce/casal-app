@@ -1,5 +1,5 @@
 import { recordPurchase, rhythmOf, snoozeUntil, stockStatus, typicalGap } from './rhythm'
-import { item, prod } from './testFactories'
+import { bag, item, prod } from './testFactories'
 
 test('recordPurchase keeps unique sorted dates, last 8', () => {
   expect(recordPurchase(['2026-10-01'], '2026-10-01')).toEqual(['2026-10-01'])
@@ -38,9 +38,9 @@ test('snoozed or given up is not due', () => {
   expect(rhythmOf(prod({ ...base, snoozeCount: 3 }), '2026-10-05').due).toBe(false)
 })
 
-test('snoozeUntil is a third of the gap, at least 2 days', () => {
+test('snoozeUntil is a third of the gap, at least 2 days; 7 days without a rhythm', () => {
   expect(snoozeUntil(prod({ boughtKeys: ['2026-09-01', '2026-09-13', '2026-09-25'] }), '2026-10-01')).toBe('2026-10-05')
-  expect(snoozeUntil(prod(), '2026-10-01')).toBe('2026-10-03')
+  expect(snoozeUntil(prod(), '2026-10-01')).toBe('2026-10-08')
 })
 
 test('stockStatus: on the list is missing, past the rhythm is maybe, everything else is there', () => {
@@ -50,4 +50,20 @@ test('stockStatus: on the list is missing, past the rhythm is maybe, everything 
   expect(stockStatus(prod({ ...late, snoozedUntil: '2026-11-05' }), [], '2026-10-29')).toBe('ha')
   expect(stockStatus(prod({ boughtKeys: ['2026-10-28'] }), [], '2026-10-29')).toBe('ha')
   expect(stockStatus(prod(), [], '2026-10-29')).toBe('ha') // never bought through the app
+})
+
+describe('stockStatus for Congelador products counts bags', () => {
+  const p = prod({ id: 'v', name: 'Vaca', location: 'congelador', boughtKeys: ['2026-10-01'] })
+  test('bags → ha; none → talvez; on the list → falta', () => {
+    expect(stockStatus(p, [], '2026-10-29', [bag({ productId: 'v' })])).toBe('ha')
+    expect(stockStatus(p, [], '2026-10-29', [])).toBe('talvez')
+    expect(stockStatus(p, [item({ productId: 'v' })], '2026-10-29', [])).toBe('falta')
+  })
+  test('never bought through the app, or snoozed → not talvez', () => {
+    expect(stockStatus({ ...p, boughtKeys: undefined }, [], '2026-10-29', [])).toBe('ha')
+    expect(stockStatus({ ...p, snoozedUntil: '2026-11-05' }, [], '2026-10-29', [])).toBe('ha')
+  })
+  test('snooze without a rhythm lasts 7 days', () => {
+    expect(snoozeUntil(p, '2026-10-29')).toBe('2026-11-05')
+  })
 })
