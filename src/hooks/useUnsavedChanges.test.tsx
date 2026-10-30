@@ -1,3 +1,4 @@
+import { StrictMode } from 'react'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { createMemoryRouter, Outlet, RouterProvider } from 'react-router-dom'
 import TabBar from '../components/TabBar'
@@ -18,7 +19,7 @@ const renderAt = (dirty: boolean, entries = ['/mais/rotinas/r1']) => {
       { path: '/compras', element: <p>compras</p> },
     ],
   }], { initialEntries: entries, initialIndex: entries.length - 1 })
-  render(<RouterProvider router={router} />)
+  render(<StrictMode><RouterProvider router={router} /></StrictMode>)
   return router
 }
 

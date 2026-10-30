@@ -216,4 +216,33 @@ export default {
     await shot(page, 'cc-5-zonas')
     if (errors.length) throw new Error(`page errors: ${errors.join(' | ')}`)
   },
+
+  // Arrumação: the Android Back button in an editor with unsaved changes asks first; staying keeps the edits.
+  async voltar({ login, shot, expectText }) {
+    await (await import('./ui-admin.mjs')).resetDb()
+    const { page } = await login('rui')
+    const errors = []
+    page.on('pageerror', e => errors.push(e.message))
+    // tap through the app like a person: a page.goto() entry is not the router's, and the router cannot block a Back into it
+    await page.getByRole('link', { name: /Mais/ }).click()
+    await page.getByRole('link', { name: /Rotinas e checklists/ }).click()
+    await page.getByRole('button', { name: '+ Nova rotina' }).click()
+    await page.getByRole('button', { name: '+ Passo' }).click()
+    await page.getByPlaceholder('Passo').fill('Beber água')
+
+    const asked = []
+    page.once('dialog', d => { asked.push(d.message()); d.dismiss() })
+    await page.goBack()
+    await page.waitForTimeout(500)
+    if (asked[0] !== 'Tens alterações por guardar. Sair mesmo assim?') throw new Error(`Back did not ask: ${JSON.stringify(asked)}`)
+    if (await page.getByPlaceholder('Passo').inputValue() !== 'Beber água') throw new Error('edits lost after staying')
+    console.log('ok: Back asks, and "Cancelar" keeps the edits')
+    await shot(page, 'voltar-ficou')
+
+    page.once('dialog', d => d.accept())
+    await page.goBack()
+    await expectText(page, '+ Nova rotina', 'accepting leaves the editor')
+    await shot(page, 'voltar-saiu')
+    if (errors.length) throw new Error(`page errors: ${errors.join(' | ')}`)
+  },
 }
