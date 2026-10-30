@@ -3,6 +3,7 @@ import { SessionProvider } from './data/session'
 import TabBar from './components/TabBar'
 import OfflineBadge from './components/OfflineBadge'
 import ErrorBoundary from './components/ErrorBoundary'
+import { useTidyUp } from './hooks/useTidyUp'
 import Hoje from './screens/Hoje'
 import Compras from './screens/Compras'
 import Congelador from './screens/Congelador'
@@ -13,6 +14,7 @@ import './styles.css'
 /** The screens, guarded: an error shows "Algo correu mal" and switching tab clears it (the tab bar stays outside). */
 function Layout() {
   const { pathname } = useLocation()
+  useTidyUp()
   return (
     <>
       <main className="app">

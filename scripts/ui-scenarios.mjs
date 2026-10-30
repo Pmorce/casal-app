@@ -257,4 +257,34 @@ export default {
     await shot(page, 'voltar-apagou')
     if (errors.length) throw new Error(`page errors: ${errors.join(' | ')}`)
   },
+
+  // Task 5: two products "Leite" and two linked items, left by two offline phones -> merged in the background.
+  async arrumacao({ login, shot, expectText }) {
+    const { adminDb, resetDb } = await import('./ui-admin.mjs')
+    await resetDb()
+    await adminDb.collection('products').doc('a').set({ name: 'Leite', location: 'frigorifico' })
+    await adminDb.collection('products').doc('b').set({ name: 'Leite', location: 'frigorifico', boughtKeys: ['2026-10-01', '2026-10-15'] })
+    await adminDb.collection('shopping').doc('i1').set({ text: 'Leite', addedBy: 'ana', status: 'porComprar', productId: 'a' })
+    await adminDb.collection('shopping').doc('i2').set({ text: 'Leite', addedBy: 'rui', status: 'porComprar', productId: 'b' })
+    const { page } = await login('ana')
+    const errors = []
+    page.on('pageerror', e => errors.push(e.message))
+    await page.getByRole('link', { name: /Compras/ }).click()
+    await page.waitForTimeout(4000)
+    const n = await page.getByText('Leite', { exact: true }).count()
+    if (n !== 1) throw new Error(`expected one "Leite" on the list, found ${n}`)
+    await expectText(page, 'Frigorífico', 'list grouped under Frigorífico')
+    console.log('ok: one "Leite" on the list')
+    await shot(page, 'arrumacao-compras')
+    await page.getByRole('link', { name: /Casa/ }).click()
+    await page.waitForTimeout(1000)
+    const c = await page.locator('.row', { hasText: 'Leite' }).count()
+    if (c !== 1) throw new Error(`expected one "Leite" in Casa, found ${c}`)
+    console.log('ok: one "Leite" in Casa')
+    await shot(page, 'arrumacao-casa')
+    const [prods, items] = await Promise.all([adminDb.collection('products').get(), adminDb.collection('shopping').get()])
+    if (prods.size !== 1 || prods.docs[0].id !== 'b' || items.size !== 1) throw new Error(`server not merged: ${prods.size} products, ${items.size} items`)
+    console.log('ok: server holds product b with 1 item')
+    if (errors.length) throw new Error(`page errors: ${errors.join(' | ')}`)
+  },
 }
