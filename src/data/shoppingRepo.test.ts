@@ -1,5 +1,5 @@
-import { addItem, boughtOutside, finish, markMissing, setFreezerCategory, undoFinish } from './shoppingRepo'
-import { item, prod } from '../domain/testFactories'
+import { addItem, boughtOutside, finish, markMissing, renameProduct, setFreezerCategory, undoFinish } from './shoppingRepo'
+import { bag, item, prod } from '../domain/testFactories'
 
 const fs = vi.hoisted(() => ({
   addDoc: vi.fn(async (_ref: unknown, _data: Record<string, unknown>) => ({ id: 'new' })),
@@ -112,4 +112,17 @@ test('Falta adds a new item when only other names are on the list', () => {
   markMissing(prod({ id: 'c', name: 'Café' }), 'P', [item({ text: 'Chá' })])
   expect(fs.addDoc).toHaveBeenCalledTimes(1)
   expect(fs.updateDoc).not.toHaveBeenCalled()
+})
+
+test('rename updates the linked list items and freezer bags, not the others', () => {
+  renameProduct(
+    prod({ id: 'p1', name: 'Bifes' }), 'Bifes de peru',
+    [item({ id: 'i1', productId: 'p1' }), item({ id: 'i2', productId: 'p2' })],
+    [bag({ id: 'b1', productId: 'p1' }), bag({ id: 'b2', name: 'Bifes' })],
+  )
+  expect(fs.update).toHaveBeenCalledWith(expect.objectContaining({ path: 'freezerBags/b1' }), { name: 'Bifes de peru' })
+  expect(fs.update).not.toHaveBeenCalledWith(expect.objectContaining({ path: 'freezerBags/b2' }), expect.anything())
+  expect(fs.update).not.toHaveBeenCalledWith(expect.objectContaining({ path: 'shopping/i2' }), expect.anything())
+  expect(fs.update).toHaveBeenCalledWith(expect.objectContaining({ path: 'shopping/i1' }), { text: 'Bifes de peru' })
+  expect(fs.commit).toHaveBeenCalledTimes(1)
 })

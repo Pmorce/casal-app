@@ -5,7 +5,7 @@ import { cleanText, findProduct, finishShopping, isOnList, normalize } from '../
 import { itemsOfProduct } from '../domain/pantry'
 import { recordPurchase, snoozeUntil } from '../domain/rhythm'
 import type { DateKey } from '../domain/dates'
-import type { Product, ShoppingItem, Zone } from '../domain/types'
+import type { FreezerBag, Product, ShoppingItem, Zone } from '../domain/types'
 
 /**
  * A known product name goes straight on the list. A new name returns 'needsZone' without writing:
@@ -143,11 +143,12 @@ export function addProduct(name: string, location: Zone, products: Product[]): '
 
 export const deleteItem = (id: string) => fire(deleteDoc(doc(db, 'shopping', id)))
 
-/** Rename keeps the list in step: items linked to the product show the new name. */
-export function renameProduct(p: Product, name: string, items: ShoppingItem[]): void {
+/** Rename keeps the list and the freezer in step: items and bags linked to the product show the new name. */
+export function renameProduct(p: Product, name: string, items: ShoppingItem[], bags: FreezerBag[]): void {
   const batch = writeBatch(db)
   batch.update(doc(db, 'products', p.id), { name })
   items.filter(i => i.productId === p.id).forEach(i => batch.update(doc(db, 'shopping', i.id), { text: name }))
+  bags.filter(b => b.productId === p.id).forEach(b => batch.update(doc(db, 'freezerBags', b.id), { name }))
   fire(batch.commit())
 }
 

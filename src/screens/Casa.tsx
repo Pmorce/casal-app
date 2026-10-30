@@ -105,7 +105,7 @@ export default function Casa() {
           <div className="card" key={zone.value}>
             <div className="card-title">{zone.label}</div>
             {!list.length && <p className="small muted">Sem produtos ainda.</p>}
-            {list.map(p => <EditRow key={p.id} product={p} products={products} items={items} onDelete={() => remove(p)} />)}
+            {list.map(p => <EditRow key={p.id} product={p} products={products} items={items} bags={bags} onDelete={() => remove(p)} />)}
           </div>
         )
       }) : (
@@ -160,7 +160,7 @@ export default function Casa() {
   )
 }
 
-function EditRow({ product, products, items, onDelete }: { product: Product; products: Product[]; items: ShoppingItem[]; onDelete: () => void }) {
+function EditRow({ product, products, items, bags, onDelete }: { product: Product; products: Product[]; items: ShoppingItem[]; bags: FreezerBag[]; onDelete: () => void }) {
   const [name, setName] = useState(product.name)
   const [error, setError] = useState('')
 
@@ -169,7 +169,7 @@ function EditRow({ product, products, items, onDelete }: { product: Product; pro
     const r = checkRename(product, name, products)
     if ('error' in r) return setError(r.error)
     setName(r.ok)
-    if (r.ok !== product.name) renameProduct(product, r.ok, items)
+    if (r.ok !== product.name) renameProduct(product, r.ok, items, bags)
   }
 
   return (
