@@ -1,4 +1,4 @@
-import { addItem, boughtOutside, finish, undoFinish } from './shoppingRepo'
+import { addItem, boughtOutside, finish, setFreezerCategory, undoFinish } from './shoppingRepo'
 import { item, prod } from '../domain/testFactories'
 
 const fs = vi.hoisted(() => ({
@@ -83,4 +83,9 @@ test('undoFinish puts the items back and deletes rhythm fields that did not exis
   undoFinish(done)
   expect(fs.set).toHaveBeenCalledWith(expect.objectContaining({ id: 'i1' }), expect.objectContaining({ text: 'Café', productId: 'p1' }))
   expect(fs.updateDoc).toHaveBeenCalledWith(expect.anything(), { boughtKeys: ['2026-10-01'], snoozedUntil: 'DEL', snoozeCount: 'DEL' })
+})
+
+test('setFreezerCategory updates only that field', () => {
+  setFreezerCategory(prod({ id: 'g' }), 'carne')
+  expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'products/g' }), { freezerCategory: 'carne' })
 })

@@ -146,6 +146,9 @@ export function renameProduct(p: Product, name: string, items: ShoppingItem[]): 
   fire(batch.commit())
 }
 
+export const setFreezerCategory = (p: Product, freezerCategory: 'carne' | 'outros') =>
+  fire(updateDoc(doc(db, 'products', p.id), { freezerCategory }))
+
 export const moveProduct = (p: Product, location: Zone) => fire(updateDoc(doc(db, 'products', p.id), { location }))
 
 /** Deletes the product and the item it left on the list; returns both so the UI can undo. */

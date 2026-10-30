@@ -1,18 +1,22 @@
-import { addBags, removeOldest } from './freezerRepo'
+import { addBags, addSameAsLast, deleteBags, freezeBought, removeOldest, splitBag } from './freezerRepo'
 import { groupBags } from '../domain/freezer'
-import { bag } from '../domain/testFactories'
+import { bag, prod } from '../domain/testFactories'
 
 const fs = vi.hoisted(() => ({
   set: vi.fn(),
+  delete: vi.fn(),
   commit: vi.fn(async () => {}),
   deleteDoc: vi.fn(async () => {}),
+  updateDoc: vi.fn(async (_ref: unknown, _data: unknown) => {}),
+  n: 0,
 }))
 vi.mock('./firebase', () => ({ db: {} }))
 vi.mock('firebase/firestore', async () => ({
   collection: vi.fn(() => 'bagsRef'),
-  doc: vi.fn((...args: unknown[]) => ({ path: args.slice(1).join('/') || 'new' })),
-  writeBatch: () => ({ set: fs.set, commit: fs.commit }),
+  doc: vi.fn((...args: unknown[]) => ({ id: String(args[2] ?? `new${++fs.n}`), path: args.slice(1).join('/') || 'new' })),
+  writeBatch: () => ({ set: fs.set, delete: fs.delete, commit: fs.commit }),
   deleteDoc: fs.deleteDoc,
+  updateDoc: fs.updateDoc,
   serverTimestamp: () => 'now',
 }))
 
@@ -43,5 +47,53 @@ test('removeOldest deletes the oldest bag of the group and returns it for undo',
   const g = groupBags([bag({ id: 'new', addedKey: '2026-10-01' }), bag({ id: 'old', addedKey: '2026-05-01' })])[0]
   const removed = await removeOldest(g)
   expect(removed.id).toBe('old')
-  expect(fs.deleteDoc).toHaveBeenCalledWith({ path: 'freezerBags/old' })
+  expect(fs.deleteDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'freezerBags/old' }))
+})
+
+test('freezeBought: one bag per product, linked, in one batch; freezerLast updated outside it', () => {
+  const p = prod({ id: 'v', name: 'Carne de vaca', location: 'congelador' })
+  const ids = freezeBought([{ product: p, amount: 5, unit: 'kg' }], '2026-10-30')
+  expect(ids).toHaveLength(1)
+  expect(fs.set.mock.calls[0][1]).toEqual(expect.objectContaining({ name: 'Carne de vaca', category: 'carne', productId: 'v', amount: 5, unit: 'kg', addedKey: '2026-10-30' }))
+  expect(fs.commit).toHaveBeenCalledTimes(1)
+  expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'products/v' }), { freezerLast: { amount: 5, unit: 'kg' } })
+})
+
+test('freezeBought still creates the bags when the product update fails (product deleted meanwhile)', () => {
+  fs.updateDoc.mockRejectedValueOnce(new Error('not-found'))
+  freezeBought([{ product: prod({ id: 'gone', name: 'Gelado', location: 'congelador' }), amount: 1, unit: 'un' }], '2026-10-30')
+  expect(fs.set).toHaveBeenCalledTimes(1)
+  expect(fs.set.mock.calls[0][1]).toEqual(expect.objectContaining({ category: 'outros' }))
+  expect(fs.commit).toHaveBeenCalledTimes(1)
+})
+
+test('splitBag replaces the bag with N bags keeping date, category and link', () => {
+  const b = bag({ id: 'b1', amount: 5, unit: 'kg', addedKey: '2026-10-20', productId: 'v' })
+  expect(splitBag(b, [1, 1, 1, 1, 1])).toHaveLength(5)
+  expect(fs.delete).toHaveBeenCalledTimes(1)
+  expect(fs.set.mock.calls[4][1]).toEqual(expect.objectContaining({ amount: 1, unit: 'kg', addedKey: '2026-10-20', productId: 'v', category: 'carne' }))
+  expect(fs.commit).toHaveBeenCalledTimes(1)
+})
+
+test('splitBag refuses fewer than 2 parts or a zero part', () => {
+  const b = bag({ amount: 5 })
+  expect(() => splitBag(b, [5])).toThrow()
+  expect(() => splitBag(b, [5, 0])).toThrow()
+  expect(fs.commit).not.toHaveBeenCalled()
+})
+
+test('a hand-made bag split keeps no product link field', () => {
+  splitBag(bag({ amount: 2 }), [1, 1])
+  expect(fs.set.mock.calls[0][1]).not.toHaveProperty('productId')
+})
+
+test('addSameAsLast keeps the product link', () => {
+  addSameAsLast(groupBags([bag({ productId: 'v' })])[0], '2026-10-30')
+  expect(fs.set.mock.calls[0][1]).toEqual(expect.objectContaining({ productId: 'v' }))
+})
+
+test('deleteBags removes them in one batch', () => {
+  deleteBags(['a', 'b'])
+  expect(fs.delete).toHaveBeenCalledTimes(2)
+  expect(fs.commit).toHaveBeenCalledTimes(1)
 })

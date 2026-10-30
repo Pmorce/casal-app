@@ -3,8 +3,9 @@ import { db } from './firebase'
 import { fire } from './write'
 import { cleanText } from '../domain/shopping'
 import { oldestBag, type FreezerGroup } from '../domain/freezer'
+import { freezerCategoryOf } from '../domain/zones'
 import type { DateKey } from '../domain/dates'
-import type { FreezerBag } from '../domain/types'
+import type { FreezerBag, FreezerUnit, Product } from '../domain/types'
 
 export interface NewBags {
   name: string
@@ -12,7 +13,12 @@ export interface NewBags {
   amount: number
   unit: FreezerBag['unit']
   count: number
+  productId?: string
 }
+
+/** Firestore has no undefined: the link is written only when there is one. */
+const link = (productId?: string) => (productId ? { productId } : {})
+const newBagRef = () => doc(collection(db, 'freezerBags'))
 
 /** Throws on invalid input; otherwise writes in the background. */
 export function addBags(input: NewBags, today: DateKey): void {
@@ -22,8 +28,8 @@ export function addBags(input: NewBags, today: DateKey): void {
   if (!(input.amount > 0)) throw new Error('Quantidade inválida')
   const batch = writeBatch(db)
   for (let i = 0; i < input.count; i++) {
-    batch.set(doc(collection(db, 'freezerBags')), {
-      name, category: input.category, amount: input.amount, unit: input.unit, addedKey: today, createdAt: serverTimestamp(),
+    batch.set(newBagRef(), {
+      name, category: input.category, amount: input.amount, unit: input.unit, addedKey: today, createdAt: serverTimestamp(), ...link(input.productId),
     })
   }
   fire(batch.commit())
@@ -44,7 +50,7 @@ export function restoreBag(b: FreezerBag): void {
 /** "+": another bag like the most recent one, entered today. */
 export function addSameAsLast(g: FreezerGroup, today: DateKey): void {
   const last = g.bags[g.bags.length - 1]
-  addBags({ name: last.name, category: last.category, amount: last.amount, unit: last.unit, count: 1 }, today)
+  addBags({ name: last.name, category: last.category, amount: last.amount, unit: last.unit, count: 1, productId: last.productId }, today)
 }
 
 export function updateBag(b: FreezerBag, changes: Partial<Pick<FreezerBag, 'amount' | 'addedKey'>>): void {
@@ -52,3 +58,45 @@ export function updateBag(b: FreezerBag, changes: Partial<Pick<FreezerBag, 'amou
 }
 
 export const deleteBag = (id: string) => fire(deleteDoc(doc(db, 'freezerBags', id)))
+
+/**
+ * "Para o congelador": one bag per product, as it came from the shop, linked to it. The bags go in one batch;
+ * each product's last amount is updated on its own, so a product deleted meanwhile does not take the bags down.
+ */
+export function freezeBought(rows: { product: Product; amount: number; unit: FreezerUnit }[], today: DateKey): string[] {
+  const batch = writeBatch(db)
+  const ids = rows.map(({ product, amount, unit }) => {
+    const ref = newBagRef()
+    batch.set(ref, {
+      name: product.name, category: freezerCategoryOf(product), amount, unit, addedKey: today, productId: product.id, createdAt: serverTimestamp(),
+    })
+    return ref.id
+  })
+  fire(batch.commit())
+  rows.forEach(({ product, amount, unit }) => fire(updateDoc(doc(db, 'products', product.id), { freezerLast: { amount, unit } })))
+  return ids
+}
+
+/** "Dividir": the bag becomes one bag per amount, same entry date, tab and link. Returns the new ids for undo. */
+export function splitBag(b: FreezerBag, amounts: number[]): string[] {
+  if (amounts.length < 2 || amounts.length > 20) throw new Error('Nº de sacos inválido')
+  if (amounts.some(a => !(a > 0))) throw new Error('Quantidade inválida')
+  const batch = writeBatch(db)
+  batch.delete(doc(db, 'freezerBags', b.id))
+  const ids = amounts.map(amount => {
+    const ref = newBagRef()
+    batch.set(ref, {
+      name: b.name, category: b.category, amount, unit: b.unit, addedKey: b.addedKey, createdAt: serverTimestamp(), ...link(b.productId),
+    })
+    return ref.id
+  })
+  fire(batch.commit())
+  return ids
+}
+
+export function deleteBags(ids: string[]): void {
+  if (!ids.length) return
+  const batch = writeBatch(db)
+  ids.forEach(id => batch.delete(doc(db, 'freezerBags', id)))
+  fire(batch.commit())
+}
