@@ -6,7 +6,7 @@ import { addProduct, boughtOutside, deleteProduct, markMissing, moveProduct, ren
 import { restore } from '../data/restore'
 import { checkRename } from '../domain/pantry'
 import { rhythmOf, stockStatus, type StockStatus } from '../domain/rhythm'
-import { bagsOfProduct, bagsSummary } from '../domain/freezer'
+import { bagsOfProduct, bagsSummary, unlinkOrphans } from '../domain/freezer'
 import SpentForm from '../components/SpentForm'
 import FreezeForm from '../components/FreezeForm'
 import { freezerCategoryOf, ZONES } from '../domain/zones'
@@ -36,9 +36,10 @@ function rhythmNote(p: Product, today: DateKey): string {
 }
 
 /** Congelador products are known by their bags, not by a rhythm. */
-function freezerNote(p: Product, bags: FreezerBag[]): string {
+function freezerNote(p: Product, bags: FreezerBag[], status: StockStatus): string {
   const mine = bagsOfProduct(p, bags)
-  return mine.length ? bagsSummary(mine) : 'não há no congelador'
+  if (mine.length) return bagsSummary(mine)
+  return status === 'talvez' ? 'não há no congelador' : 'sem sacos registados'
 }
 
 export default function Casa() {
@@ -46,7 +47,7 @@ export default function Casa() {
   const today = useToday()
   const products = useCollection<Product>('products')
   const items = useCollection<ShoppingItem>('shopping')
-  const bags = useCollection<FreezerBag>('freezerBags')
+  const bags = unlinkOrphans(useCollection<FreezerBag>('freezerBags'), products)
   const [name, setName] = useState('')
   const [location, setLocation] = useState<Zone>('frigorifico')
   const [msg, setMsg] = useState('')
@@ -54,8 +55,9 @@ export default function Casa() {
   const [undo, setUndo] = useState<{ message: string; run: () => void; action?: { label: string; run: () => void } } | null>(null)
   const closeUndo = useCallback(() => setUndo(null), [])
   const [spentFor, setSpentFor] = useState<string | null>(null)
-  // "Comprei" on a Congelador product also asks how much went in (closing it does not undo the purchase)
-  const [freezing, setFreezing] = useState<Product | null>(null)
+  // "Comprei" on Congelador products also asks how much went in, one card for several in a row
+  // (closing it does not undo the purchases)
+  const [freezing, setFreezing] = useState<Product[]>([])
 
   function submit(e: FormEvent) {
     e.preventDefault()
@@ -75,10 +77,10 @@ export default function Casa() {
   function bought(p: Product) {
     const done = boughtOutside(p, items, today)
     setSpentFor(null)
-    setFreezing(p.location === 'congelador' ? p : null)
+    if (p.location === 'congelador') setFreezing(f => (f.some(x => x.id === p.id) ? f : [...f, p]))
     setUndo({
       message: `«${p.name}» comprado`,
-      run: () => { undoBought(done); setFreezing(null) },
+      run: () => { undoBought(done); setFreezing(f => f.filter(x => x.id !== p.id)) },
       // offered, not forced: several "Comprei" in a row are often one single purchase
       action: { label: 'Registar gasto', run: () => setSpentFor(p.name) },
     })
@@ -94,7 +96,7 @@ export default function Casa() {
         {editing ? 'Muda o nome ou o sítio; o nome grava ao sair da caixa.' : '"Falta" põe na lista. "Comprei" é para o que compraram fora da lista.'}
       </p>
 
-      {freezing && <FreezeForm key={freezing.id} products={[freezing]} today={today} onSaved={() => {}} onDone={() => setFreezing(null)} />}
+      {freezing.length > 0 && <FreezeForm products={freezing} today={today} onSaved={() => {}} onDone={() => setFreezing([])} />}
       {spentFor && <SpentForm title={`Quanto custou «${spentFor}»?`} today={today} onDone={() => setSpentFor(null)} />}
 
       {editing ? ZONES.map(zone => {
@@ -120,7 +122,7 @@ export default function Casa() {
                     <div className="grow">
                       {p.name} <span className="zone-tag">{ZONE_SHORT[p.location]}</span>
                       <div className="note">
-                        {p.location === 'congelador' ? freezerNote(p, bags) : st.value === 'talvez' ? lateNote(p, today) : rhythmNote(p, today)}
+                        {p.location === 'congelador' ? freezerNote(p, bags, st.value) : st.value === 'talvez' ? lateNote(p, today) : rhythmNote(p, today)}
                       </div>
                     </div>
                     {st.value !== 'falta' && (

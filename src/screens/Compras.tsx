@@ -6,7 +6,7 @@ import { addItem, classifyItem, deleteItem, finish, markMissing, snooze, toggleC
 import { restore } from '../data/restore'
 import { deleteBags } from '../data/freezerRepo'
 import { backToCasa, maybeMissing } from '../domain/shopping'
-import { freezerInCart } from '../domain/freezer'
+import { freezerInCart, unlinkOrphans } from '../domain/freezer'
 import { GROUP_LABEL, groupByZone, guessZone, ZONES } from '../domain/zones'
 import type { FreezerBag, Product, ShoppingItem, Zone } from '../domain/types'
 import UndoToast from '../components/UndoToast'
@@ -49,7 +49,7 @@ export default function Compras() {
   const groups = groupByZone(items.filter(i => i.status === 'porComprar'), products)
   const todoCount = groups.reduce((n, g) => n + g.items.length, 0)
   const cart = items.filter(i => i.status === 'carrinho').sort((a, b) => a.text.localeCompare(b.text, 'pt-PT'))
-  const missing = maybeMissing(products, items, today, bags)
+  const missing = maybeMissing(products, items, today, unlinkOrphans(bags, products))
   const toCasa = backToCasa(items, products)
 
   function submit(e: FormEvent) {

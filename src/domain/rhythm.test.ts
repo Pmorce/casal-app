@@ -45,15 +45,15 @@ test('snoozeUntil is a third of the gap, at least 2 days; 7 days without a rhyth
 
 test('stockStatus: on the list is missing, past the rhythm is maybe, everything else is there', () => {
   const late = prod({ id: 'l', boughtKeys: ['2026-09-01', '2026-09-11', '2026-09-21'] })
-  expect(stockStatus(late, [item({ productId: 'l', status: 'carrinho' })], '2026-10-29')).toBe('falta')
-  expect(stockStatus(late, [], '2026-10-29')).toBe('talvez')
-  expect(stockStatus(prod({ ...late, snoozedUntil: '2026-11-05' }), [], '2026-10-29')).toBe('ha')
-  expect(stockStatus(prod({ boughtKeys: ['2026-10-28'] }), [], '2026-10-29')).toBe('ha')
-  expect(stockStatus(prod(), [], '2026-10-29')).toBe('ha') // never bought through the app
+  expect(stockStatus(late, [item({ productId: 'l', status: 'carrinho' })], '2026-10-29', [])).toBe('falta')
+  expect(stockStatus(late, [], '2026-10-29', [])).toBe('talvez')
+  expect(stockStatus(prod({ ...late, snoozedUntil: '2026-11-05' }), [], '2026-10-29', [])).toBe('ha')
+  expect(stockStatus(prod({ boughtKeys: ['2026-10-28'] }), [], '2026-10-29', [])).toBe('ha')
+  expect(stockStatus(prod(), [], '2026-10-29', [])).toBe('ha') // never bought through the app
 })
 
 describe('stockStatus for Congelador products counts bags', () => {
-  const p = prod({ id: 'v', name: 'Vaca', location: 'congelador', boughtKeys: ['2026-10-01'] })
+  const p = prod({ id: 'v', name: 'Vaca', location: 'congelador', boughtKeys: ['2026-10-01'], freezerLast: { amount: 1, unit: 'kg', key: '2026-10-01' } })
   test('bags → ha; none → talvez; on the list → falta', () => {
     expect(stockStatus(p, [], '2026-10-29', [bag({ productId: 'v' })])).toBe('ha')
     expect(stockStatus(p, [], '2026-10-29', [])).toBe('talvez')
@@ -69,4 +69,11 @@ describe('stockStatus for Congelador products counts bags', () => {
   test('snooze without a rhythm lasts 7 days', () => {
     expect(snoozeUntil(p, '2026-10-29')).toBe('2026-11-05')
   })
+})
+
+test('bags of the last purchase never entered ("Agora não") → not talvez', () => {
+  const v = prod({ id: 'v', name: 'Vaca', location: 'congelador' })
+  expect(stockStatus({ ...v, boughtKeys: ['2026-10-01'] }, [], '2026-10-29', [])).toBe('ha')
+  expect(stockStatus({ ...v, boughtKeys: ['2026-10-01', '2026-10-20'], freezerLast: { amount: 1, unit: 'kg', key: '2026-10-01' } }, [], '2026-10-29', [])).toBe('ha')
+  expect(stockStatus({ ...v, boughtKeys: ['2026-10-01', '2026-10-20'], freezerLast: { amount: 1, unit: 'kg', key: '2026-10-20' } }, [], '2026-10-29', [])).toBe('talvez')
 })

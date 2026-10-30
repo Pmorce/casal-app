@@ -45,7 +45,7 @@ export type MaybeMissing =
  * "Talvez falte", not on the list yet: Congelador products with no bags left first (counted, so surer),
  * then products past their usual rhythm, most overdue first.
  */
-export function maybeMissing(products: Product[], items: ShoppingItem[], today: DateKey, bags: FreezerBag[] = []): MaybeMissing[] {
+export function maybeMissing(products: Product[], items: ShoppingItem[], today: DateKey, bags: FreezerBag[]): MaybeMissing[] {
   const listed = new Set(items.flatMap(i => (i.productId ? [i.productId] : [])))
   const open = products.filter(p => !listed.has(p.id))
   const frozen: MaybeMissing[] = open

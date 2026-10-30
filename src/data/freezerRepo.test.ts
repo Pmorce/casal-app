@@ -56,7 +56,7 @@ test('freezeBought: one bag per product, linked, in one batch; freezerLast updat
   expect(ids).toHaveLength(1)
   expect(fs.set.mock.calls[0][1]).toEqual(expect.objectContaining({ name: 'Carne de vaca', category: 'carne', productId: 'v', amount: 5, unit: 'kg', addedKey: '2026-10-30' }))
   expect(fs.commit).toHaveBeenCalledTimes(1)
-  expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'products/v' }), { freezerLast: { amount: 5, unit: 'kg' } })
+  expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'products/v' }), { freezerLast: { amount: 5, unit: 'kg', key: '2026-10-30' } })
 })
 
 test('freezeBought still creates the bags when the product update fails (product deleted meanwhile)', () => {

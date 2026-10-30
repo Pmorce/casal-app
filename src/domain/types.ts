@@ -29,7 +29,7 @@ export interface Product {
   /** zone congelador only: which freezer tab its bags go to (else guessed from the name) */
   freezerCategory?: 'carne' | 'outros'
   /** zone congelador only: amount of the last entry, to pre-fill the next one */
-  freezerLast?: { amount: number; unit: FreezerUnit }
+  freezerLast?: { amount: number; unit: FreezerUnit; key?: DateKey }
 }
 
 export type FreezerUnit = 'un' | 'g' | 'kg' | 'doses'

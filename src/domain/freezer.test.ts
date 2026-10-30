@@ -1,4 +1,4 @@
-import { parseAmount, summary, groupBags, oldestBag, isOld, bagsOfProduct, splitAmounts, freezeDefaults, freezerInCart } from './freezer'
+import { parseAmount, summary, groupBags, oldestBag, isOld, bagsOfProduct, splitAmounts, freezeDefaults, freezerInCart, unlinkOrphans } from './freezer'
 import { bag, item, prod } from './testFactories'
 
 const group = (bags: ReturnType<typeof bag>[]) => groupBags(bags)[0]
@@ -67,4 +67,15 @@ test('freezerInCart lists Congelador products in the cart, once', () => {
   const products = [prod({ id: 'c', location: 'congelador' }), prod({ id: 'd', location: 'despensa' })]
   const items = [item({ status: 'carrinho', productId: 'c' }), item({ status: 'carrinho', productId: 'd' }), item({ status: 'porComprar', productId: 'c' }), item({ status: 'carrinho', productId: 'c' })]
   expect(freezerInCart(items, products).map(p => p.id)).toEqual(['c'])
+})
+
+test('freezeDefaults writes big amounts without a thousands space (else the card rejects its own prefill)', () => {
+  expect(freezeDefaults(prod({ name: 'Vaca', location: 'congelador', freezerLast: { amount: 10000, unit: 'g' } })).amount).toBe('10000')
+})
+
+test('bags of a deleted product count again by name (unlinkOrphans)', () => {
+  const vaca = prod({ id: 'new', name: 'Vaca', location: 'congelador' })
+  const bags = unlinkOrphans([bag({ name: 'Vaca', category: 'carne', productId: 'gone' }), bag({ name: 'Vaca', productId: 'new' })], [vaca])
+  expect(bags[0]).not.toHaveProperty('productId')
+  expect(bagsOfProduct(vaca, bags)).toHaveLength(2)
 })

@@ -170,7 +170,7 @@ test('Desfazer after saving the freezer card also deletes the new bags', () => {
 })
 
 test('a Congelador product without bags shows in Talvez falte as "não há no congelador"', () => {
-  data.products = [prod({ id: 'v', name: 'Carne de vaca', location: 'congelador', boughtKeys: ['2026-10-01'] })]
+  data.products = [prod({ id: 'v', name: 'Carne de vaca', location: 'congelador', boughtKeys: ['2026-10-01'], freezerLast: { amount: 1, unit: 'kg', key: '2026-10-01' } })]
   data.shopping = []
   renderIt()
   expect(screen.getByText('não há no congelador')).toBeTruthy()

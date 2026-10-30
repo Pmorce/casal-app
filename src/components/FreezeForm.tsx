@@ -11,7 +11,7 @@ const UNITS: { value: FreezerUnit; label: string }[] = [
   { value: 'doses', label: 'doses' },
 ]
 
-interface Row { product: Product; amount: string; unit: FreezerUnit; invalid: boolean }
+interface Edit { amount?: string; unit?: FreezerUnit; invalid?: boolean }
 
 interface Props {
   products: Product[]
@@ -23,16 +23,20 @@ interface Props {
 
 /**
  * "Para o congelador": what was bought for the freezer goes in as one bag per product, as it came from the shop
- * (dividing happens later, at home). Scrolls itself into view so it is never off-screen.
+ * (dividing happens later, at home). Products added while it is open (several "Comprei") join it, keeping what was typed.
+ * Scrolls itself into view so it is never off-screen.
  */
 export default function FreezeForm({ products, today, onSaved, onDone }: Props) {
-  const [rows, setRows] = useState<Row[]>(() => products.map(p => ({ product: p, ...freezeDefaults(p), invalid: false })))
+  const [edits, setEdits] = useState<Record<string, Edit>>({})
+  const [saved, setSaved] = useState<string[]>([])
+  const rows = products
+    .filter(p => !saved.includes(p.id))
+    .map(p => ({ product: p, ...freezeDefaults(p), invalid: false, ...edits[p.id] }))
   const form = useRef<HTMLFormElement>(null)
   // braces matter: recent Chromium returns a Promise here, and React would call it as the cleanup (black screen)
   useEffect(() => { form.current?.scrollIntoView?.({ block: 'center', behavior: 'smooth' }) }, [])
 
-  const change = (id: string, patch: Partial<Row>) =>
-    setRows(rs => rs.map(r => (r.product.id === id ? { ...r, ...patch, invalid: false } : r)))
+  const change = (id: string, patch: Edit) => setEdits(e => ({ ...e, [id]: { ...e[id], ...patch, invalid: false } }))
 
   function save(e: FormEvent) {
     e.preventDefault()
@@ -40,10 +44,13 @@ export default function FreezeForm({ products, today, onSaved, onDone }: Props) 
       const amount = parseAmount(r.amount)
       return amount === null ? [] : [{ product: r.product, amount, unit: r.unit }]
     })
-    const left = rows.filter(r => parseAmount(r.amount) === null).map(r => ({ ...r, invalid: true }))
-    if (valid.length) onSaved(freezeBought(valid, today))
+    const left = rows.filter(r => parseAmount(r.amount) === null)
+    if (valid.length) {
+      onSaved(freezeBought(valid, today))
+      setSaved(s => [...s, ...valid.map(v => v.product.id)])
+    }
     if (!left.length) return onDone()
-    setRows(left)
+    setEdits(e => ({ ...e, ...Object.fromEntries(left.map(r => [r.product.id, { ...e[r.product.id], invalid: true }])) }))
   }
 
   return (

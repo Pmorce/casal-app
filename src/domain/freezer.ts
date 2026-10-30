@@ -75,6 +75,16 @@ export function bagsOfProduct(p: Product, bags: FreezerBag[]): FreezerBag[] {
 
 const round2 = (n: number) => Math.round(n * 100) / 100
 
+/** Bags whose product was deleted lose the link, so they count again by name (a product re-created with that name). */
+export function unlinkOrphans(bags: FreezerBag[], products: Product[]): FreezerBag[] {
+  const ids = new Set(products.map(p => p.id))
+  return bags.map(b => {
+    if (!b.productId || ids.has(b.productId)) return b
+    const { productId: _gone, ...rest } = b
+    return rest
+  })
+}
+
 /** "Dividir": equal parts with 2 decimals; the last one takes the rounding so the total stays exact. */
 export function splitAmounts(total: number, count: number): number[] {
   const part = round2(total / count)
@@ -84,7 +94,7 @@ export function splitAmounts(total: number, count: number): number[] {
 
 /** What the "Para o congelador" row starts with: the last entry, else kg for meat and units for the rest. */
 export function freezeDefaults(p: Product): { amount: string; unit: FreezerUnit } {
-  if (p.freezerLast) return { amount: num.format(p.freezerLast.amount).replace(/s/g, ''), unit: p.freezerLast.unit }
+  if (p.freezerLast) return { amount: num.format(p.freezerLast.amount).replace(/\s/g, ''), unit: p.freezerLast.unit }
   return { amount: '', unit: freezerCategoryOf(p) === 'carne' ? 'kg' : 'un' }
 }
 

@@ -44,8 +44,12 @@ export function isHeld(p: Product, today: DateKey): boolean {
  */
 export function freezerDue(p: Product, bags: FreezerBag[], today: DateKey): boolean {
   const last = p.boughtKeys?.[p.boughtKeys.length - 1]
+  if (p.location !== 'congelador' || last === undefined) return false
   // bought today: its bags may still be on their way in (the "Para o congelador" card)
-  return p.location === 'congelador' && last !== undefined && last < today && !bagsOfProduct(p, bags).length && !isHeld(p, today)
+  if (last >= today) return false
+  // the bags of the last purchase were never entered ("Agora não"): no bags tells nothing
+  if (!p.freezerLast?.key || p.freezerLast.key < last) return false
+  return !bagsOfProduct(p, bags).length && !isHeld(p, today)
 }
 
 export function snoozeUntil(p: Product, today: DateKey): DateKey {
@@ -56,7 +60,7 @@ export function snoozeUntil(p: Product, today: DateKey): DateKey {
 /** What Casa shows at a glance, without counting stock: on the list, probably out (past its rhythm), or there. */
 export type StockStatus = 'falta' | 'talvez' | 'ha'
 
-export function stockStatus(p: Product, items: ShoppingItem[], today: DateKey, bags: FreezerBag[] = []): StockStatus {
+export function stockStatus(p: Product, items: ShoppingItem[], today: DateKey, bags: FreezerBag[]): StockStatus {
   if (items.some(i => i.productId === p.id)) return 'falta'
   const due = p.location === 'congelador' ? freezerDue(p, bags, today) : rhythmOf(p, today).due
   return due ? 'talvez' : 'ha'

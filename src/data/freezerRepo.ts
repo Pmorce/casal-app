@@ -73,7 +73,7 @@ export function freezeBought(rows: { product: Product; amount: number; unit: Fre
     return ref.id
   })
   fire(batch.commit())
-  rows.forEach(({ product, amount, unit }) => fire(updateDoc(doc(db, 'products', product.id), { freezerLast: { amount, unit } })))
+  rows.forEach(({ product, amount, unit }) => fire(updateDoc(doc(db, 'products', product.id), { freezerLast: { amount, unit, key: today } })))
   return ids
 }
 

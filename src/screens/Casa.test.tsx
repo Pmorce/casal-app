@@ -77,7 +77,7 @@ test('Congelador products show their bags instead of a rhythm', () => {
 })
 
 test('a bought Congelador product with no bags is 🟠 Talvez falte, "não há no congelador"', () => {
-  data.products = [prod({ id: 'v', name: 'Vaca', location: 'congelador', boughtKeys: ['2026-10-01'] })]
+  data.products = [prod({ id: 'v', name: 'Vaca', location: 'congelador', boughtKeys: ['2026-10-01'], freezerLast: { amount: 1, unit: 'kg', key: '2026-10-01' } })]
   renderIt()
   expect(screen.getByRole('heading', { level: 3 }).textContent).toBe('🟠 Talvez falte (1)')
   expect(screen.getByText('não há no congelador')).toBeTruthy()
@@ -118,4 +118,25 @@ test('Desfazer after Comprei closes an unanswered Para o congelador', () => {
   fireEvent.click(screen.getByRole('button', { name: 'Desfazer' }))
   expect(repo.undoBought).toHaveBeenCalled()
   expect(screen.queryByText(/Para o congelador/)).toBeNull()
+})
+
+test('a Congelador product bought without entering bags stays 🟢 Há, "sem sacos registados"', () => {
+  data.products = [prod({ id: 'v', name: 'Vaca', location: 'congelador', boughtKeys: ['2026-10-01'] })]
+  renderIt()
+  expect(screen.getByRole('heading', { level: 3 }).textContent).toBe('🟢 Há (1)')
+  expect(screen.getByText('sem sacos registados')).toBeTruthy()
+})
+
+test('several Comprei in a row gather the Congelador products in one card; Desfazer removes only that one', () => {
+  data.products = [prod({ id: 'v', name: 'Vaca', location: 'congelador' }), prod({ id: 'c', name: 'Café' }), prod({ id: 'g', name: 'Gelado', location: 'congelador' })]
+  renderIt()
+  fireEvent.click(screen.getByRole('button', { name: 'Comprei Vaca' }))
+  fireEvent.change(screen.getByLabelText('Quantidade de Vaca'), { target: { value: '5' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Comprei Café' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Comprei Gelado' }))
+  expect((screen.getByLabelText('Quantidade de Vaca') as HTMLInputElement).value).toBe('5')
+  expect(screen.getByLabelText('Quantidade de Gelado')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Desfazer' }))
+  expect(screen.queryByLabelText('Quantidade de Gelado')).toBeNull()
+  expect(screen.getByLabelText('Quantidade de Vaca')).toBeTruthy()
 })
