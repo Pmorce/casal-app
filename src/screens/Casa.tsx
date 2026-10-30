@@ -5,7 +5,7 @@ import { useToday } from '../hooks/useToday'
 import { addProduct, boughtOutside, deleteProduct, markMissing, moveProduct, renameProduct, setFreezerCategory, snooze, undoBought } from '../data/shoppingRepo'
 import { restore } from '../data/restore'
 import { checkRename } from '../domain/pantry'
-import { MAX_SNOOZES, rhythmOf, stockStatus, type StockStatus } from '../domain/rhythm'
+import { MAX_SNOOZES, rhythmOf, shownGap, stockStatus, type StockStatus } from '../domain/rhythm'
 import { bagsOfProduct, bagsSummary, unlinkOrphans } from '../domain/freezer'
 import SpentForm from '../components/SpentForm'
 import FreezeForm from '../components/FreezeForm'
@@ -24,7 +24,7 @@ const byName = (list: Product[]) => [...list].sort((a, b) => a.name.localeCompar
 
 function lateNote(p: Product, today: DateKey): string {
   const { gap, since } = rhythmOf(p, today)
-  return `dura ~${gap} dias · vai em ${since}`
+  return `dura ~${shownGap(gap ?? 0)} dias · vai em ${since}`
 }
 
 /** What the app knows about how often it is bought. */
@@ -32,7 +32,7 @@ function rhythmNote(p: Product, today: DateKey): string {
   const { gap, since } = rhythmOf(p, today)
   if (since === null) return 'nunca comprado'
   const ago = since === 0 ? 'comprado hoje' : `comprado há ${since} ${since === 1 ? 'dia' : 'dias'}`
-  return gap === null ? `${ago} · a aprender` : `${ago} · dura ~${gap}`
+  return gap === null ? `${ago} · a aprender` : `${ago} · dura ~${shownGap(gap)}`
 }
 
 /** Congelador products are known by their bags, not by a rhythm. */

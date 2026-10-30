@@ -22,3 +22,9 @@ test('monthTotals sums by person within the month only', () => {
     exp({ uid: 'p', cents: 1, dateKey: '2026-09-01' }),
   ], 2026, 8)).toEqual({ byUid: { b: 15900, p: 4000 }, total: 19900 })
 })
+
+test('parseEuros accepts ",5" as 50 cents but not a lone comma', () => {
+  expect(parseEuros(',5')).toBe(50)
+  expect(parseEuros('.75')).toBe(75)
+  expect(parseEuros(',')).toBeNull()
+})

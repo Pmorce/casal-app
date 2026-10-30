@@ -91,3 +91,10 @@ test('maxSplit: at most 20 bags, and never below 0,01 each', () => {
   expect(maxSplit(0.1)).toBe(10)
   expect(maxSplit(0.01)).toBe(1)
 })
+
+test('parseAmount accepts ",5" and ".5" but not a lone comma', () => {
+  expect(parseAmount(',5')).toBe(0.5)
+  expect(parseAmount('.5')).toBe(0.5)
+  expect(parseAmount(',')).toBeNull()
+  expect(parseAmount('.')).toBeNull()
+})

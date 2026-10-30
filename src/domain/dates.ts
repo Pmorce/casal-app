@@ -35,6 +35,12 @@ export function daysBetween(a: DateKey, b: DateKey): number {
 }
 
 /** Wall-clock ms left until 00:00 in Lisbon (may be off by 1h on DST change days; callers re-check). */
+/**
+ * When to look at the date again: just after midnight, but at least hourly — on the days the clocks change
+ * the day is 23 or 25 hours long and a single timer would be an hour off.
+ */
+export const nextDateCheck = (now: Date): number => Math.min(msUntilNextMidnight(now) + 500, 3_600_000)
+
 export function msUntilNextMidnight(now: Date): number {
   const [h, m, s] = timeFormat.format(now).split(':').map(Number)
   const elapsed = ((h * 60 + m) * 60 + s) * 1000 + now.getMilliseconds()

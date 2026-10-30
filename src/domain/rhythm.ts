@@ -52,6 +52,9 @@ export function freezerDue(p: Product, bags: FreezerBag[], today: DateKey): bool
   return !bagsOfProduct(p, bags).length && !isHeld(p, today)
 }
 
+/** For display only (the due rule keeps the exact median): "~8 dias", never "~7.5". */
+export const shownGap = (gap: number): number => Math.round(gap)
+
 export function snoozeUntil(p: Product, today: DateKey): DateKey {
   const gap = typicalGap(p.boughtKeys)
   return addDays(today, gap === null ? 7 : Math.max(2, Math.round(gap / 3)))

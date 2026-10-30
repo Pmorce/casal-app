@@ -150,3 +150,10 @@ test('a product snoozed 3 times says it is no longer suggested', () => {
   expect(screen.getAllByText(/não sugiro até voltarem a comprar/)).toHaveLength(1)
   expect(screen.getByText(/não sugiro até voltarem a comprar/).closest('.row')?.textContent).toMatch(/Café/)
 })
+
+test('the usual duration is shown in whole days', () => {
+  data.products = [prod({ name: 'Café', boughtKeys: ['2026-10-01', '2026-10-08', '2026-10-16'] })]
+  renderIt()
+  expect(screen.getByText(/dura ~8 dias/)).toBeTruthy()
+  expect(screen.queryByText(/7[.,]5/)).toBeNull()
+})

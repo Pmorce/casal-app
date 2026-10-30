@@ -6,6 +6,7 @@ import { addItem, classifyItem, deleteItem, finish, markMissing, snooze, toggleC
 import { restore } from '../data/restore'
 import { undoFreeze, type FrozenBatch } from '../data/freezerRepo'
 import { backToCasa, maybeMissing } from '../domain/shopping'
+import { shownGap } from '../domain/rhythm'
 import { freezerInCart, unlinkOrphans } from '../domain/freezer'
 import { GROUP_LABEL, groupByZone, guessZone, ZONES } from '../domain/zones'
 import type { FreezerBag, Product, ShoppingItem, Zone } from '../domain/types'
@@ -139,7 +140,7 @@ export default function Compras() {
             <div className="row" key={m.product.id}>
               <div className="grow">
                 {m.product.name}
-                <div className="note">{m.reason === 'congelador' ? 'não há no congelador' : `costuma durar ~${m.gap} dias · vai em ${m.since}`}</div>
+                <div className="note">{m.reason === 'congelador' ? 'não há no congelador' : `costuma durar ~${shownGap(m.gap)} dias · vai em ${m.since}`}</div>
               </div>
               <button className="btn small primary" onClick={() => markMissing(m.product, uid, items)}>Falta</button>
               <button className="btn small" onClick={() => snooze(m.product, today)}>Ainda há</button>

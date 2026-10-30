@@ -1,4 +1,4 @@
-import { todayKey, weekdayOf, addDays, daysBetween, msUntilNextMidnight } from './dates'
+import { todayKey, weekdayOf, addDays, daysBetween, msUntilNextMidnight, nextDateCheck } from './dates'
 
 describe('todayKey (Europe/Lisbon)', () => {
   test('summer: 23:30 UTC is already the next day in Lisbon', () => {
@@ -27,4 +27,9 @@ test('daysBetween', () => {
 test('msUntilNextMidnight in Lisbon', () => {
   expect(msUntilNextMidnight(new Date('2026-10-29T23:59:00Z'))).toBe(60_000)
   expect(msUntilNextMidnight(new Date('2026-07-14T22:59:00Z'))).toBe(60_000)
+})
+
+test('nextDateCheck waits until just after midnight, but never more than an hour (DST days)', () => {
+  expect(nextDateCheck(new Date('2026-10-30T12:00:00Z'))).toBe(3_600_000)
+  expect(nextDateCheck(new Date('2026-10-30T23:59:00Z'))).toBe(60_000 + 500)
 })

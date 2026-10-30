@@ -1,4 +1,4 @@
-import { recordPurchase, rhythmOf, snoozeUntil, stockStatus, typicalGap } from './rhythm'
+import { recordPurchase, rhythmOf, shownGap, snoozeUntil, stockStatus, typicalGap } from './rhythm'
 import { bag, item, prod } from './testFactories'
 
 test('recordPurchase keeps unique sorted dates, last 8', () => {
@@ -76,4 +76,9 @@ test('bags of the last purchase never entered ("Agora não") → not talvez', ()
   expect(stockStatus({ ...v, boughtKeys: ['2026-10-01'] }, [], '2026-10-29', [])).toBe('ha')
   expect(stockStatus({ ...v, boughtKeys: ['2026-10-01', '2026-10-20'], freezerLast: { amount: 1, unit: 'kg', key: '2026-10-01' } }, [], '2026-10-29', [])).toBe('ha')
   expect(stockStatus({ ...v, boughtKeys: ['2026-10-01', '2026-10-20'], freezerLast: { amount: 1, unit: 'kg', key: '2026-10-20' } }, [], '2026-10-29', [])).toBe('talvez')
+})
+
+test('shownGap rounds the typical gap to whole days', () => {
+  expect(shownGap(7.5)).toBe(8)
+  expect(shownGap(10)).toBe(10)
 })

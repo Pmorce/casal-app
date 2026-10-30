@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { msUntilNextMidnight, todayKey, type DateKey } from '../domain/dates'
+import { nextDateCheck, todayKey, type DateKey } from '../domain/dates'
 
 /** Today's date in Lisbon; updates at midnight and when the app returns to the foreground. */
 export function useToday(): DateKey {
@@ -10,7 +10,7 @@ export function useToday(): DateKey {
     const refresh = () => {
       setToday(todayKey(new Date()))
       clearTimeout(timer)
-      timer = setTimeout(refresh, msUntilNextMidnight(new Date()) + 500)
+      timer = setTimeout(refresh, nextDateCheck(new Date()))
     }
     refresh()
     document.addEventListener('visibilitychange', refresh)

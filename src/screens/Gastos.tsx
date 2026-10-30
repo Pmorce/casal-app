@@ -17,27 +17,31 @@ export default function Gastos() {
   const expenses = useCollection<Expense>('expenses')
   const [value, setValue] = useState('')
   const [who, setWho] = useState(uid)
-  const [dateKey, setDateKey] = useState(today)
+  // null = today: left open past midnight, the form and the month follow the new day unless changed by hand
+  const [pickedDate, setPickedDate] = useState<string | null>(null)
+  const dateKey = pickedDate ?? today
   const [note, setNote] = useState('')
   const [error, setError] = useState('')
   const [undo, setUndo] = useState<Expense | null>(null)
   const closeUndo = useCallback(() => setUndo(null), [])
-  const [ym, setYm] = useState(() => ({ y: Number(today.slice(0, 4)), m: Number(today.slice(5, 7)) }))
+  const [pickedMonth, setYm] = useState<{ y: number; m: number } | null>(null)
+  const ym = pickedMonth ?? { y: Number(today.slice(0, 4)), m: Number(today.slice(5, 7)) }
 
   async function submit(e: FormEvent) {
     e.preventDefault()
     const cents = parseEuros(value)
     if (cents === null) return setError('Valor inválido')
-    addExpense(cents, who, dateKey || today, note)
+    addExpense(cents, who, dateKey, note)
+    setPickedDate(null)
     setValue('')
     setNote('')
     setError('')
   }
 
-  const shift = (d: number) => setYm(({ y, m }) => {
-    const t = y * 12 + (m - 1) + d
-    return { y: Math.floor(t / 12), m: (t % 12) + 1 }
-  })
+  const shift = (d: number) => {
+    const t = ym.y * 12 + (ym.m - 1) + d
+    setYm({ y: Math.floor(t / 12), m: (t % 12) + 1 })
+  }
   const totals = monthTotals(expenses, ym.y, ym.m)
   const prefix = `${ym.y}-${String(ym.m).padStart(2, '0')}`
   const list = expenses.filter(e => e.dateKey.startsWith(prefix)).sort((a, b) => b.dateKey.localeCompare(a.dateKey))
@@ -56,7 +60,7 @@ export default function Gastos() {
         <input className="input" inputMode="decimal" placeholder="Valor (ex.: 12,50)" value={value}
           onChange={e => { setValue(e.target.value); setError('') }} />
         <div className="inline" style={{ marginTop: 8 }}>
-          <input className="input" type="date" value={dateKey} onChange={e => setDateKey(e.target.value)} style={{ flex: 1 }} />
+          <input className="input" type="date" value={dateKey} onChange={e => setPickedDate(e.target.value || null)} style={{ flex: 1 }} />
           <input className="input" placeholder="Nota (opcional)" value={note} onChange={e => setNote(e.target.value)} style={{ flex: 1 }} />
         </div>
         {error && <p className="error">{error}</p>}
