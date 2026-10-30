@@ -33,8 +33,9 @@ export default function Congelador() {
   const [category, setCategory] = useState<FreezerBag['category']>('carne')
   const [adding, setAdding] = useState(false)
   const [open, setOpen] = useState<string | null>(null)
-  const [undo, setUndo] = useState<{ message: string; run: () => void } | null>(null)
-  const [askList, setAskList] = useState<FreezerGroup | null>(null)
+  const [undo, setUndo] = useState<{
+    message: string; run: () => void; action?: { label: string; run: () => void }; dismiss?: () => void
+  } | null>(null)
   const [fixing, setFixing] = useState<string | null>(null)
   const [splitting, setSplitting] = useState<string | null>(null)
   const closeUndo = useCallback(() => setUndo(null), [])
@@ -45,8 +46,14 @@ export default function Congelador() {
   function minus(g: FreezerGroup) {
     const wasLast = g.bags.length === 1
     const bag = removeOldest(g)
-    setUndo({ message: 'Saco retirado', run: () => { restoreBag(bag); setAskList(null) } })
-    if (wasLast) setAskList(g)
+    if (!wasLast) return setUndo({ message: 'Saco retirado', run: () => restoreBag(bag) })
+    // the last one: asked at the bottom of the screen, always in view (a card at the top was missed)
+    setUndo({
+      message: `Acabou ${g.name}`,
+      run: () => restoreBag(bag),
+      action: { label: 'Pôr na lista', run: () => answerList(g, true) },
+      dismiss: () => answerList(g, false),
+    })
   }
 
   /** The Casa product the group stands for: linked by its bags, else one with the same name. */
@@ -55,14 +62,12 @@ export default function Congelador() {
     return products.find(p => p.id === linked) ?? findProduct(g.name, products)
   }
 
-  function answerList(yes: boolean) {
-    if (!askList) return
-    const product = productOf(askList)
+  function answerList(g: FreezerGroup, yes: boolean) {
+    const product = productOf(g)
     if (yes && product) markMissing(product, uid, items)
-    else if (yes) addItem(askList.name, uid, products, items, guessZone(askList.name))
-    // "Não" on a Congelador product means "ainda há": its "Talvez falte" waits a while
+    else if (yes) addItem(g.name, uid, products, items, guessZone(g.name))
+    // ✕ on a Congelador product means "ainda há": its "Talvez falte" waits a while
     else if (product?.location === 'congelador') snooze(product, today)
-    setAskList(null)
   }
 
   function split(b: FreezerBag, amounts: number[]) {
@@ -80,15 +85,6 @@ export default function Congelador() {
         ))}
       </div>
 
-      {askList && (
-        <div className="card">
-          <div>Acabou <strong>{askList.name}</strong>. Adicionar à lista de compras?</div>
-          <div className="inline" style={{ marginTop: 8 }}>
-            <button className="btn primary" onClick={() => answerList(true)}>Sim</button>
-            <button className="btn" onClick={() => answerList(false)}>Não</button>
-          </div>
-        </div>
-      )}
 
       {adding ? (
         <NovoSaco category={category} names={names} today={today} onDone={() => setAdding(false)} />
@@ -132,7 +128,7 @@ export default function Congelador() {
         )
       })}
 
-      {undo && <UndoToast message={undo.message} onUndo={undo.run} onClose={closeUndo} />}
+      {undo && <UndoToast message={undo.message} onUndo={undo.run} onClose={closeUndo} action={undo.action} onDismiss={undo.dismiss} />}
     </>
   )
 }

@@ -20,3 +20,12 @@ test('a toast offering an action stays until answered, and can be dismissed', ()
   expect(onClose).toHaveBeenCalled()
   vi.useRealTimers()
 })
+
+test('the ✕ of an offer calls onDismiss, then closes', () => {
+  const onClose = vi.fn()
+  const onDismiss = vi.fn()
+  render(<UndoToast message="Acabou Vaca" onUndo={() => {}} onClose={onClose} onDismiss={onDismiss} action={{ label: 'Pôr na lista', run: () => {} }} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Fechar' }))
+  expect(onDismiss).toHaveBeenCalled()
+  expect(onClose).toHaveBeenCalled()
+})

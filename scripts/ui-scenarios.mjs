@@ -57,9 +57,9 @@ export default {
     await page.getByRole('button', { name: 'Desfazer' }).click()
     await expectText(page, '2 sacos · 4 un.', 'undo restores one bag')
     await minus.click(); await minus.click()
-    await expectText(page, 'Adicionar à lista de compras?', 'last bag asks about the list')
+    await expectText(page, 'Acabou Bifes de frango', 'last bag asks about the list')
     await shot(page, 'congelador-ask')
-    await page.getByRole('button', { name: 'Sim' }).click()
+    await page.getByRole('button', { name: 'Pôr na lista' }).click()
     await page.goto(page.url().split('#')[0] + '#/compras')
     await expectText(page, 'Bifes de frango', 'item added to the shopping list')
   },

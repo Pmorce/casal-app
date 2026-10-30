@@ -83,32 +83,56 @@ test('an edited amount per bag gives equal bags; an invalid one is refused', () 
   expect(freezer.splitBag).toHaveBeenCalledWith(b, [0.5, 0.5, 0.5])
 })
 
-test('last bag of a linked product: Sim puts that product on the list', () => {
+const lastBagOfVaca = () => {
   const v = prod({ id: 'v', name: 'Vaca', location: 'congelador' })
   data.products = [v]
   data.bags = [bag({ name: 'Vaca', productId: 'v' })]
   renderIt()
   fireEvent.click(screen.getByRole('button', { name: 'Tirar um saco de Vaca' }))
-  fireEvent.click(screen.getByRole('button', { name: 'Sim' }))
+  return v
+}
+
+test('the last bag shows "Acabou X" in the bottom toast, not a card at the top', () => {
+  lastBagOfVaca()
+  expect(screen.getByText('Acabou Vaca').closest('.toast')).toBeTruthy()
+  expect(screen.queryByText(/Adicionar à lista de compras\?/)).toBeNull()
+})
+
+test('last bag of a linked product: "Pôr na lista" puts that product on the list', () => {
+  const v = lastBagOfVaca()
+  fireEvent.click(screen.getByRole('button', { name: 'Pôr na lista' }))
   expect(shop.markMissing).toHaveBeenCalledWith(v, 'P', [])
   expect(shop.addItem).not.toHaveBeenCalled()
 })
 
-test('last bag of a linked product: Não snoozes the suggestion', () => {
-  const v = prod({ id: 'v', name: 'Vaca', location: 'congelador' })
-  data.products = [v]
-  data.bags = [bag({ name: 'Vaca', productId: 'v' })]
+test('last bag of a linked product: ✕ snoozes the suggestion', () => {
+  const v = lastBagOfVaca()
+  fireEvent.click(screen.getByRole('button', { name: 'Fechar' }))
+  expect(shop.snooze).toHaveBeenCalledWith(v, '2026-10-29')
+  expect(shop.markMissing).not.toHaveBeenCalled()
+})
+
+test('Desfazer on "Acabou X" puts the bag back and asks nothing else', () => {
+  lastBagOfVaca()
+  fireEvent.click(screen.getByRole('button', { name: 'Desfazer' }))
+  expect(freezer.restoreBag).toHaveBeenCalled()
+  expect(shop.markMissing).not.toHaveBeenCalled()
+  expect(shop.snooze).not.toHaveBeenCalled()
+})
+
+test('a bag that is not the last keeps the plain "Saco retirado" toast', () => {
+  data.bags = [bag({ name: 'Vaca' }), bag({ name: 'Vaca' })]
   renderIt()
   fireEvent.click(screen.getByRole('button', { name: 'Tirar um saco de Vaca' }))
-  fireEvent.click(screen.getByRole('button', { name: 'Não' }))
-  expect(shop.snooze).toHaveBeenCalledWith(v, '2026-10-29')
+  expect(screen.getByText('Saco retirado')).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'Pôr na lista' })).toBeNull()
 })
 
 test('last bag with no product still adds the name to the list', () => {
   data.bags = [bag({ name: 'Sopa', category: 'carne' })]
   renderIt()
   fireEvent.click(screen.getByRole('button', { name: 'Tirar um saco de Sopa' }))
-  fireEvent.click(screen.getByRole('button', { name: 'Sim' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Pôr na lista' }))
   expect(shop.addItem).toHaveBeenCalledWith('Sopa', 'P', [], [], 'despensa')
 })
 
