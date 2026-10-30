@@ -1,5 +1,6 @@
 import { addItem, boughtOutside, finish, markMissing, renameProduct, setFreezerCategory, undoFinish } from './shoppingRepo'
 import { bag, item, prod } from '../domain/testFactories'
+import { fire } from './write'
 
 const fs = vi.hoisted(() => ({
   addDoc: vi.fn(async (_ref: unknown, _data: Record<string, unknown>) => ({ id: 'new' })),
@@ -7,6 +8,7 @@ const fs = vi.hoisted(() => ({
   updateDoc: vi.fn(async () => {}),
 }))
 vi.mock('./firebase', () => ({ db: {} }))
+vi.mock('./write', () => ({ fire: vi.fn() }))
 vi.mock('firebase/firestore', async () => ({
   collection: vi.fn(() => 'shoppingRef'),
   doc: vi.fn((...args: unknown[]) => ({ id: String(args[2] ?? 'newId'), path: args.slice(1).join('/') })),
@@ -114,15 +116,18 @@ test('Falta adds a new item when only other names are on the list', () => {
   expect(fs.updateDoc).not.toHaveBeenCalled()
 })
 
-test('rename updates the linked list items and freezer bags, not the others', () => {
+test('rename writes the product loudly and each linked item and bag on its own, quietly', () => {
   renameProduct(
     prod({ id: 'p1', name: 'Bifes' }), 'Bifes de peru',
     [item({ id: 'i1', productId: 'p1' }), item({ id: 'i2', productId: 'p2' })],
     [bag({ id: 'b1', productId: 'p1' }), bag({ id: 'b2', name: 'Bifes' })],
   )
-  expect(fs.update).toHaveBeenCalledWith(expect.objectContaining({ path: 'freezerBags/b1' }), { name: 'Bifes de peru' })
-  expect(fs.update).not.toHaveBeenCalledWith(expect.objectContaining({ path: 'freezerBags/b2' }), expect.anything())
-  expect(fs.update).not.toHaveBeenCalledWith(expect.objectContaining({ path: 'shopping/i2' }), expect.anything())
-  expect(fs.update).toHaveBeenCalledWith(expect.objectContaining({ path: 'shopping/i1' }), { text: 'Bifes de peru' })
-  expect(fs.commit).toHaveBeenCalledTimes(1)
+  const paths = fs.updateDoc.mock.calls.map(c => (c as unknown as [{ path: string }, unknown])[0].path)
+  expect(paths).toEqual(['products/p1', 'shopping/i1', 'freezerBags/b1'])
+  expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'shopping/i1' }), { text: 'Bifes de peru' })
+  expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'freezerBags/b1' }), { name: 'Bifes de peru' })
+  // the person's rename must not ride on a doc the other phone may have removed: no batch, only the product write is loud
+  expect(fs.commit).not.toHaveBeenCalled()
+  const opts = vi.mocked(fire).mock.calls.map(c => c[1])
+  expect(opts).toEqual([undefined, { quiet: true }, { quiet: true }])
 })

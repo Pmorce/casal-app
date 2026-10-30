@@ -143,13 +143,15 @@ export function addProduct(name: string, location: Zone, products: Product[]): '
 
 export const deleteItem = (id: string) => fire(deleteDoc(doc(db, 'shopping', id)))
 
-/** Rename keeps the list and the freezer in step: items and bags linked to the product show the new name. */
+/**
+ * Rename keeps the list and the freezer in step: items and bags linked to the product show the new name.
+ * No batch: a bag or item the other phone removed would make the server reject it all and undo the rename.
+ * Only the product write is loud; the rest are quiet, and the background tidy-up repairs any that fail.
+ */
 export function renameProduct(p: Product, name: string, items: ShoppingItem[], bags: FreezerBag[]): void {
-  const batch = writeBatch(db)
-  batch.update(doc(db, 'products', p.id), { name })
-  items.filter(i => i.productId === p.id).forEach(i => batch.update(doc(db, 'shopping', i.id), { text: name }))
-  bags.filter(b => b.productId === p.id).forEach(b => batch.update(doc(db, 'freezerBags', b.id), { name }))
-  fire(batch.commit())
+  fire(updateDoc(doc(db, 'products', p.id), { name }))
+  items.filter(i => i.productId === p.id).forEach(i => fire(updateDoc(doc(db, 'shopping', i.id), { text: name }), { quiet: true }))
+  bags.filter(b => b.productId === p.id).forEach(b => fire(updateDoc(doc(db, 'freezerBags', b.id), { name }), { quiet: true }))
 }
 
 export const setFreezerCategory = (p: Product, freezerCategory: 'carne' | 'outros') =>

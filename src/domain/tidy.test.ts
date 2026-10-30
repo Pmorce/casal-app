@@ -62,6 +62,14 @@ describe('tidyPlan', () => {
     expect(plan.products).toEqual([{ id: 'a', data: { freezerLast: { amount: 2, unit: 'un' }, freezerCategory: 'carne' } }])
   })
 
+  it('the kept product keeps its own freezerLast', () => {
+    const a = prod({ id: 'a', name: 'Bife', freezerLast: { amount: 1, unit: 'kg' }, boughtKeys: ['2026-10-01', '2026-10-02'] })
+    const b = prod({ id: 'b', name: 'bife', freezerLast: { amount: 2, unit: 'un' } })
+    const plan = tidyPlan([a, b], [], [])
+    expect(plan.deleteProducts).toEqual(['b'])
+    expect(plan.products.every(p => !('freezerLast' in p.data))).toBe(true)
+  })
+
   it('a linked item and bag with an old name get the product name', () => {
     const plan = tidyPlan([prod({ id: 'p', name: 'Leite' })], [item({ id: 'i', text: 'leit', productId: 'p' })], [bag({ id: 'g', name: 'leit', productId: 'p' })])
     expect(plan.items).toEqual([{ id: 'i', data: { text: 'Leite' } }])

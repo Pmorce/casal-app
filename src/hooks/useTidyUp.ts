@@ -7,8 +7,8 @@ import type { FreezerBag, Product, ShoppingItem } from '../domain/types'
 
 /**
  * Background tidy-up of what two offline phones leave behind (duplicate products, stale names…).
- * Runs only on server-confirmed data while online, so both phones plan from the same truth; our own
- * writes make the next snapshots pending, which keeps it from repeating while they round-trip.
+ * Runs only on server-confirmed data while online, so both phones plan from the same truth. Our own
+ * updates make the next snapshots pending, which keeps it from repeating while they round-trip.
  * Planning waits for onSnapshotsInSync: one server change (e.g. a rename batch) reaches the three
  * listeners one after another, and planning in between would see a mix of old and new versions.
  */
@@ -17,6 +17,8 @@ export function useTidyUp(): void {
     const docs: Record<string, { id: string }[]> = { products: [], shopping: [], freezerBags: [] }
     const fresh: Record<string, boolean> = { products: false, shopping: false, freezerBags: false }
 
+    // A pending delete drops the doc from the view, so it leaves hasPendingWrites false: a delete-only plan
+    // may be re-planned at once on the local state, which is harmless because the plan converges to empty.
     const check = () => {
       if (!navigator.onLine || !Object.values(fresh).every(Boolean)) return
       const plan = tidyPlan(docs.products as Product[], docs.shopping as ShoppingItem[], docs.freezerBags as FreezerBag[])
