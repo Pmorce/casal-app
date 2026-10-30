@@ -1,4 +1,4 @@
-import { recordPurchase, rhythmOf, shownGap, snoozeUntil, stockStatus, typicalGap } from './rhythm'
+import { mergePurchases, recordPurchase, rhythmOf, shownGap, snoozeUntil, stockStatus, typicalGap } from './rhythm'
 import { bag, item, prod } from './testFactories'
 
 test('recordPurchase keeps unique sorted dates, last 8', () => {
@@ -81,4 +81,8 @@ test('bags of the last purchase never entered ("Agora não") → not talvez', ()
 test('shownGap rounds the typical gap to whole days', () => {
   expect(shownGap(7.5)).toBe(8)
   expect(shownGap(10)).toBe(10)
+})
+
+test('mergePurchases is the sorted union, last 8', () => {
+  expect(mergePurchases(['2026-10-05'], ['2026-10-01', '2026-10-05'])).toEqual(['2026-10-01', '2026-10-05'])
 })

@@ -10,6 +10,11 @@ export function recordPurchase(boughtKeys: DateKey[] | undefined, day: DateKey):
   return [...new Set([...(boughtKeys ?? []), day])].sort().slice(-KEEP)
 }
 
+/** Union of two purchase histories, same cap as `recordPurchase`. */
+export function mergePurchases(a: DateKey[] | undefined, b: DateKey[] | undefined): DateKey[] {
+  return [...new Set([...(a ?? []), ...(b ?? [])])].sort().slice(-KEEP)
+}
+
 /** Median days between purchases; null until bought twice. */
 export function typicalGap(boughtKeys: DateKey[] | undefined): number | null {
   const keys = boughtKeys ?? []
