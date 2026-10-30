@@ -2,14 +2,28 @@ import { useCallback, useState, type FormEvent } from 'react'
 import { useCollection } from '../data/useCollection'
 import { useSession } from '../data/session'
 import { useToday } from '../hooks/useToday'
-import { addProduct, boughtOutside, deleteProduct, markMissing, moveProduct, renameProduct, undoBought } from '../data/shoppingRepo'
+import { addProduct, boughtOutside, deleteProduct, markMissing, moveProduct, renameProduct, snooze, undoBought } from '../data/shoppingRepo'
 import { restore } from '../data/restore'
 import { checkRename } from '../domain/pantry'
-import { rhythmOf } from '../domain/rhythm'
+import { rhythmOf, stockStatus, type StockStatus } from '../domain/rhythm'
+import SpentForm from '../components/SpentForm'
 import { ZONES } from '../domain/zones'
 import type { DateKey } from '../domain/dates'
 import type { Product, ShoppingItem, Zone } from '../domain/types'
 import UndoToast from '../components/UndoToast'
+
+const STATUS: { value: StockStatus; title: string }[] = [
+  { value: 'falta', title: '🔴 Falta' },
+  { value: 'talvez', title: '🟠 Talvez falte' },
+  { value: 'ha', title: '🟢 Há' },
+]
+const ZONE_SHORT = Object.fromEntries(ZONES.map(z => [z.value, z.short])) as Record<Zone, string>
+const byName = (list: Product[]) => [...list].sort((a, b) => a.name.localeCompare(b.name, 'pt-PT'))
+
+function lateNote(p: Product, today: DateKey): string {
+  const { gap, since } = rhythmOf(p, today)
+  return `dura ~${gap} dias · vai em ${since}`
+}
 
 /** What the app knows about how often it is bought. */
 function rhythmNote(p: Product, today: DateKey): string {
@@ -28,8 +42,9 @@ export default function Casa() {
   const [location, setLocation] = useState<Zone>('frigorifico')
   const [msg, setMsg] = useState('')
   const [editing, setEditing] = useState(false)
-  const [undo, setUndo] = useState<{ message: string; run: () => void } | null>(null)
+  const [undo, setUndo] = useState<{ message: string; run: () => void; action?: { label: string; run: () => void } } | null>(null)
   const closeUndo = useCallback(() => setUndo(null), [])
+  const [spentFor, setSpentFor] = useState<string | null>(null)
 
   function submit(e: FormEvent) {
     e.preventDefault()
@@ -48,7 +63,13 @@ export default function Casa() {
 
   function bought(p: Product) {
     const done = boughtOutside(p, items, today)
-    setUndo({ message: `«${p.name}» comprado`, run: () => undoBought(done) })
+    setSpentFor(null)
+    setUndo({
+      message: `«${p.name}» comprado`,
+      run: () => undoBought(done),
+      // offered, not forced: several "Comprei" in a row are often one single purchase
+      action: { label: 'Registar gasto', run: () => setSpentFor(p.name) },
+    })
   }
 
   return (
@@ -61,30 +82,48 @@ export default function Casa() {
         {editing ? 'Muda o nome ou o sítio; o nome grava ao sair da caixa.' : '"Falta" põe na lista. "Comprei" é para o que compraram fora da lista.'}
       </p>
 
-      {ZONES.map(zone => {
-        const list = products.filter(p => p.location === zone.value).sort((a, b) => a.name.localeCompare(b.name, 'pt-PT'))
+      {spentFor && <SpentForm title={`Quanto custou «${spentFor}»?`} today={today} onDone={() => setSpentFor(null)} />}
+
+      {editing ? ZONES.map(zone => {
+        const list = byName(products.filter(p => p.location === zone.value))
         return (
           <div className="card" key={zone.value}>
             <div className="card-title">{zone.label}</div>
             {!list.length && <p className="small muted">Sem produtos ainda.</p>}
-            {list.map(p => {
-              if (editing) return <EditRow key={p.id} product={p} products={products} items={items} onDelete={() => remove(p)} />
-              const listed = items.some(i => i.productId === p.id)
-              return (
-                <div className="row" key={p.id}>
-                  <div className="grow">
-                    {p.name}
-                    <div className="note">{rhythmNote(p, today)}</div>
-                  </div>
-                  <button className="btn small" disabled={listed} aria-label={listed ? `${p.name} na lista` : `Falta ${p.name}`}
-                    onClick={() => markMissing(p, uid, items)}>{listed ? 'na lista' : 'Falta'}</button>
-                  <button className="btn small" aria-label={`Comprei ${p.name}`} onClick={() => bought(p)}>Comprei</button>
-                </div>
-              )
-            })}
+            {list.map(p => <EditRow key={p.id} product={p} products={products} items={items} onDelete={() => remove(p)} />)}
           </div>
         )
-      })}
+      }) : (
+        <>
+          {!products.length && <p className="small muted">Sem produtos ainda.</p>}
+          {STATUS.map(st => {
+            const list = byName(products.filter(p => stockStatus(p, items, today) === st.value))
+            if (!list.length) return null
+            return (
+              <div className="card" key={st.value}>
+                <h3 className="zone-title">{st.title} ({list.length})</h3>
+                {list.map(p => (
+                  <div className="row" key={p.id}>
+                    <div className="grow">
+                      {p.name} <span className="zone-tag">{ZONE_SHORT[p.location]}</span>
+                      <div className="note">{st.value === 'talvez' ? lateNote(p, today) : rhythmNote(p, today)}</div>
+                    </div>
+                    {st.value !== 'falta' && (
+                      <button className="btn small" aria-label={`Falta ${p.name}`} onClick={() => markMissing(p, uid, items)}>Falta</button>
+                    )}
+                    {st.value === 'talvez' && (
+                      <button className="btn small" aria-label={`Ainda há ${p.name}`} onClick={() => snooze(p, today)}>Ainda há</button>
+                    )}
+                    {st.value !== 'talvez' && (
+                      <button className="btn small" aria-label={`Comprei ${p.name}`} onClick={() => bought(p)}>Comprei</button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )
+          })}
+        </>
+      )}
 
       <form className="card" onSubmit={submit}>
         <div className="card-title">+ Produto</div>
@@ -98,7 +137,7 @@ export default function Casa() {
         <button className="btn primary block">Adicionar</button>
       </form>
 
-      {undo && <UndoToast message={undo.message} onUndo={undo.run} onClose={closeUndo} />}
+      {undo && <UndoToast message={undo.message} onUndo={undo.run} onClose={closeUndo} action={undo.action} />}
     </>
   )
 }

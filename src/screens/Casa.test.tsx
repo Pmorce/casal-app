@@ -12,11 +12,13 @@ vi.mock('../data/session', () => ({ useSession: () => ({ uid: 'P', name: 'Ana', 
 vi.mock('../hooks/useToday', () => ({ useToday: () => '2026-10-29' }))
 const repo = vi.hoisted(() => ({
   addProduct: vi.fn(), deleteProduct: vi.fn(), renameProduct: vi.fn(), moveProduct: vi.fn(),
-  markMissing: vi.fn(), undoBought: vi.fn(),
+  markMissing: vi.fn(), undoBought: vi.fn(), snooze: vi.fn(),
   boughtOutside: vi.fn((p: unknown) => ({ product: p, items: [] })),
 }))
 vi.mock('../data/shoppingRepo', () => repo)
 vi.mock('../data/restore', () => ({ restore: vi.fn() }))
+const exp = vi.hoisted(() => ({ addExpense: vi.fn() }))
+vi.mock('../data/expensesRepo', () => exp)
 
 const renderIt = () => render(<MemoryRouter><Casa /></MemoryRouter>)
 beforeEach(() => { vi.clearAllMocks(); data.products = []; data.shopping = [] })
@@ -39,9 +41,27 @@ test('products still learning or never bought say so', () => {
   expect(screen.getByText(/nunca comprado/)).toBeTruthy()
 })
 
-test('Falta is disabled when the product is already on the list', () => {
+test('products are grouped by what is missing first, then what may be, then what is there', () => {
+  data.products = [
+    prod({ id: 'a', name: 'Arroz', boughtKeys: ['2026-10-28'] }),
+    prod({ id: 'd', name: 'Detergente', location: 'limpeza', boughtKeys: ['2026-09-01', '2026-09-11', '2026-09-21'] }),
+    prod({ id: 'c', name: 'Café' }),
+  ]
+  data.shopping = [item({ productId: 'c' })]
+  renderIt()
+  const titles = screen.getAllByRole('heading', { level: 3 }).map(h => h.textContent)
+  expect(titles).toEqual(['🔴 Falta (1)', '🟠 Talvez falte (1)', '🟢 Há (1)'])
+  expect(screen.getAllByText('Limpeza').some(el => el.className === 'zone-tag')).toBe(true) // zone shown small on each row
+  expect(screen.getByRole('button', { name: 'Ainda há Detergente' })).toBeTruthy()
+})
+
+test('"Comprei" offers to record the spending without forcing it', () => {
   data.products = [prod({ id: 'c', name: 'Café' })]
   data.shopping = [item({ productId: 'c' })]
   renderIt()
-  expect((screen.getByRole('button', { name: 'Café na lista' }) as HTMLButtonElement).disabled).toBe(true)
+  fireEvent.click(screen.getByRole('button', { name: 'Comprei Café' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Registar gasto' }))
+  fireEvent.change(screen.getByPlaceholderText(/47,30/), { target: { value: '3,20' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Registar' }))
+  expect(exp.addExpense).toHaveBeenCalledWith(320, 'P', '2026-10-29')
 })

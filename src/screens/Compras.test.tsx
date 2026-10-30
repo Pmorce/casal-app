@@ -118,3 +118,12 @@ test('finishing asks how much it was and records it in Gastos', () => {
   expect(exp.addExpense).toHaveBeenCalledWith(4730, 'P', '2026-10-29')
   expect(screen.queryByText(/Quanto foi/)).toBeNull()
 })
+
+test('the "how much" question appears where the cart was, not at the top of the screen', () => {
+  data.shopping = [item({ text: 'Ovos', status: 'porComprar', oneOff: true }), item({ text: 'Café', status: 'carrinho' })]
+  renderIt()
+  fireEvent.click(screen.getByRole('button', { name: /Terminar compras/ }))
+  const question = screen.getByText(/Quanto foi/)
+  const list = screen.getByText('Por comprar')
+  expect(list.compareDocumentPosition(question) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+})

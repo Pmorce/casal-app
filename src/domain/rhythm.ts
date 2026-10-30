@@ -1,5 +1,5 @@
 import { addDays, daysBetween, type DateKey } from './dates'
-import type { Product } from './types'
+import type { Product, ShoppingItem } from './types'
 
 const KEEP = 8
 /** after this many "Ainda há" with no purchase, stop suggesting until the next purchase */
@@ -36,4 +36,12 @@ export function rhythmOf(p: Product, today: DateKey): { gap: number | null; sinc
 export function snoozeUntil(p: Product, today: DateKey): DateKey {
   const gap = typicalGap(p.boughtKeys)
   return addDays(today, Math.max(2, Math.round((gap ?? 0) / 3)))
+}
+
+/** What Casa shows at a glance, without counting stock: on the list, probably out (past its rhythm), or there. */
+export type StockStatus = 'falta' | 'talvez' | 'ha'
+
+export function stockStatus(p: Product, items: ShoppingItem[], today: DateKey): StockStatus {
+  if (items.some(i => i.productId === p.id)) return 'falta'
+  return rhythmOf(p, today).due ? 'talvez' : 'ha'
 }

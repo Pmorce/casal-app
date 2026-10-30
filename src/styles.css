@@ -109,3 +109,4 @@ h2 { font-size: 17px; margin: 18px 0 8px; }
 .legend i.completo { background: var(--accent); }
 .legend i.parcial { background: var(--warn-soft); border: 1px solid var(--warn); }
 .zone-title { font-size: 13px; font-weight: 600; color: var(--muted); margin: 10px 0 2px; text-transform: uppercase; letter-spacing: .04em; }
+.zone-tag { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 0 5px; margin-left: 4px; white-space: nowrap; }

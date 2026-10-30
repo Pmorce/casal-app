@@ -1,5 +1,5 @@
-import { recordPurchase, rhythmOf, snoozeUntil, typicalGap } from './rhythm'
-import { prod } from './testFactories'
+import { recordPurchase, rhythmOf, snoozeUntil, stockStatus, typicalGap } from './rhythm'
+import { item, prod } from './testFactories'
 
 test('recordPurchase keeps unique sorted dates, last 8', () => {
   expect(recordPurchase(['2026-10-01'], '2026-10-01')).toEqual(['2026-10-01'])
@@ -41,4 +41,13 @@ test('snoozed or given up is not due', () => {
 test('snoozeUntil is a third of the gap, at least 2 days', () => {
   expect(snoozeUntil(prod({ boughtKeys: ['2026-09-01', '2026-09-13', '2026-09-25'] }), '2026-10-01')).toBe('2026-10-05')
   expect(snoozeUntil(prod(), '2026-10-01')).toBe('2026-10-03')
+})
+
+test('stockStatus: on the list is missing, past the rhythm is maybe, everything else is there', () => {
+  const late = prod({ id: 'l', boughtKeys: ['2026-09-01', '2026-09-11', '2026-09-21'] })
+  expect(stockStatus(late, [item({ productId: 'l', status: 'carrinho' })], '2026-10-29')).toBe('falta')
+  expect(stockStatus(late, [], '2026-10-29')).toBe('talvez')
+  expect(stockStatus(prod({ ...late, snoozedUntil: '2026-11-05' }), [], '2026-10-29')).toBe('ha')
+  expect(stockStatus(prod({ boughtKeys: ['2026-10-28'] }), [], '2026-10-29')).toBe('ha')
+  expect(stockStatus(prod(), [], '2026-10-29')).toBe('ha') // never bought through the app
 })

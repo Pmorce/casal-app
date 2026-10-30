@@ -4,12 +4,11 @@ import { useSession } from '../data/session'
 import { useToday } from '../hooks/useToday'
 import { addItem, classifyItem, deleteItem, finish, markMissing, snooze, toggleCart, undoFinish } from '../data/shoppingRepo'
 import { restore } from '../data/restore'
-import { addExpense } from '../data/expensesRepo'
 import { backToCasa, maybeMissing } from '../domain/shopping'
 import { GROUP_LABEL, groupByZone, guessZone, ZONES } from '../domain/zones'
-import { parseEuros } from '../domain/expenses'
 import type { Product, ShoppingItem, Zone } from '../domain/types'
 import UndoToast from '../components/UndoToast'
+import SpentForm from '../components/SpentForm'
 
 type ZonePick = Zone | 'oneOff'
 const PICKS: { value: ZonePick; short: string }[] = [...ZONES, { value: 'oneOff', short: 'Só desta vez' }]
@@ -39,9 +38,6 @@ export default function Compras() {
   const closeUndo = useCallback(() => setUndo(null), [])
   // after "Terminar compras": ask how much it was, straight into Gastos
   const [askSpent, setAskSpent] = useState(false)
-  const [spent, setSpent] = useState('')
-  const [who, setWho] = useState(uid)
-  const [spentError, setSpentError] = useState('')
 
   const groups = groupByZone(items.filter(i => i.status === 'porComprar'), products)
   const todoCount = groups.reduce((n, g) => n + g.items.length, 0)
@@ -70,19 +66,8 @@ export default function Compras() {
 
   function terminate() {
     const done = finish(items, products, today)
-    setSpent('')
-    setSpentError('')
-    setWho(uid)
     setAskSpent(true)
     setUndo({ message: 'Compras terminadas', run: () => { undoFinish(done); setAskSpent(false) } })
-  }
-
-  function registerSpent(e: FormEvent) {
-    e.preventDefault()
-    const cents = parseEuros(spent)
-    if (cents === null) return setSpentError('Valor inválido')
-    addExpense(cents, who, today)
-    setAskSpent(false)
   }
 
   const row = (i: ShoppingItem, picker = false) => (
@@ -102,24 +87,6 @@ export default function Compras() {
   return (
     <>
       <h1>Lista de compras</h1>
-
-      {askSpent && (
-        <form className="card" onSubmit={registerSpent}>
-          <div className="card-title">✓ Compras terminadas. Quanto foi?</div>
-          <div className="inline">
-            <input className="input" inputMode="decimal" placeholder="Valor (ex.: 47,30)" value={spent}
-              onChange={e => { setSpent(e.target.value); setSpentError('') }} />
-            <button className="btn primary">Registar</button>
-          </div>
-          <div className="seg" style={{ marginTop: 8 }}>
-            {Object.entries(members).map(([id, name]) => (
-              <button type="button" key={id} className={who === id ? 'on' : ''} onClick={() => setWho(id)}>{name}</button>
-            ))}
-          </div>
-          {spentError && <p className="small error">{spentError}</p>}
-          <button type="button" className="link-btn" onClick={() => setAskSpent(false)}>Agora não</button>
-        </form>
-      )}
 
       <form className="inline" onSubmit={submit} style={{ marginBottom: 6 }}>
         <input className="input" list="sugestoes" placeholder="+ Adicionar (ex.: Leite)" value={text}
@@ -163,6 +130,9 @@ export default function Compras() {
           ))}
         </div>
       )}
+
+      {/* where the cart was, i.e. right under the finger that tapped "Terminar compras" */}
+      {askSpent && <SpentForm title="✓ Compras terminadas. Quanto foi?" today={today} onDone={() => setAskSpent(false)} />}
 
       {cart.length > 0 && (
         <>
