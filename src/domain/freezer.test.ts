@@ -98,3 +98,12 @@ test('parseAmount accepts ",5" and ".5" but not a lone comma', () => {
   expect(parseAmount(',')).toBeNull()
   expect(parseAmount('.')).toBeNull()
 })
+
+test('parseAmount accepts a trailing separator ("12,") but not stray ones', () => {
+  expect(parseAmount('12,')).toBe(12)
+  expect(parseAmount('12.')).toBe(12)
+  expect(parseAmount('12,5')).toBe(12.5)
+  expect(parseAmount(',')).toBeNull()
+  expect(parseAmount('12,,')).toBeNull()
+  expect(parseAmount('0,')).toBeNull()
+})

@@ -58,7 +58,7 @@ export function classifyItem(item: ShoppingItem, zone: Zone | 'oneOff', products
 export function markMissing(p: Product, uid: string, items: ShoppingItem[]): void {
   if (items.some(i => i.productId === p.id)) return
   const loose = items.find(i => !i.productId && normalize(i.text) === normalize(p.name))
-  if (loose) return fire(updateDoc(doc(db, 'shopping', loose.id), { productId: p.id, oneOff: deleteField() }))
+  if (loose) return fire(updateDoc(doc(db, 'shopping', loose.id), { productId: p.id, oneOff: deleteField(), text: p.name }))
   fire(addDoc(collection(db, 'shopping'), { text: p.name, addedBy: uid, status: 'porComprar', productId: p.id, createdAt: serverTimestamp() }))
 }
 

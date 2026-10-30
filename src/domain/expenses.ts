@@ -4,7 +4,7 @@ const eur = new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' 
 
 export function parseEuros(s: string): number | null {
   const t = s.trim().replace(',', '.')
-  if (!/^(\d+(\.\d{1,2})?|\.\d{1,2})$/.test(t)) return null // ",5" is 0,50 €
+  if (!/^(\d+(\.\d{0,2})?|\.\d{1,2})$/.test(t)) return null // ",5" is 0,50 €; "12," is 12 €
   const cents = Math.round(Number(t) * 100)
   return cents > 0 ? cents : null
 }

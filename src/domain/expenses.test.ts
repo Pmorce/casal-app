@@ -28,3 +28,10 @@ test('parseEuros accepts ",5" as 50 cents but not a lone comma', () => {
   expect(parseEuros('.75')).toBe(75)
   expect(parseEuros(',')).toBeNull()
 })
+
+test('parseEuros accepts a trailing comma ("12,")', () => {
+  expect(parseEuros('12,')).toBe(1200)
+  expect(parseEuros('12,5')).toBe(1250)
+  expect(parseEuros(',')).toBeNull()
+  expect(parseEuros('12,345')).toBeNull()
+})

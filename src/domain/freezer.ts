@@ -22,7 +22,7 @@ const num = new Intl.NumberFormat('pt-PT', { maximumFractionDigits: 2 })
 
 export function parseAmount(s: string): number | null {
   const t = s.trim().replace(',', '.')
-  if (!/^(\d+(\.\d+)?|\.\d+)$/.test(t)) return null // ",5" is 0,5
+  if (!/^(\d+(\.\d*)?|\.\d+)$/.test(t)) return null // ",5" is 0,5; "12," is 12
   const n = Number(t)
   return n > 0 ? n : null
 }

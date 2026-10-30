@@ -94,13 +94,18 @@ test('Falta links an unlinked item with the same name instead of adding another'
   const cafe = prod({ id: 'c', name: 'Café' })
   markMissing(cafe, 'P', [item({ id: 'i1', text: 'café ', status: 'porComprar' })])
   expect(fs.addDoc).not.toHaveBeenCalled()
-  expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'shopping/i1' }), { productId: 'c', oneOff: 'DEL' })
+  expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'shopping/i1' }), { productId: 'c', oneOff: 'DEL', text: 'Café' })
 })
 
 test('Falta also links a same-name item already in the cart', () => {
   markMissing(prod({ id: 'c', name: 'Café' }), 'P', [item({ id: 'i2', text: 'Café', status: 'carrinho', oneOff: true })])
   expect(fs.addDoc).not.toHaveBeenCalled()
-  expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'shopping/i2' }), { productId: 'c', oneOff: 'DEL' })
+  expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'shopping/i2' }), { productId: 'c', oneOff: 'DEL', text: 'Café' })
+})
+
+test('"Falta" linking a loose item gives it the product name', () => {
+  markMissing(prod({ id: 'p1', name: 'Leite' }), 'P', [item({ id: 'i1', text: 'leite ', oneOff: true })])
+  expect(fs.updateDoc).toHaveBeenCalledWith(expect.anything(), { productId: 'p1', oneOff: 'DEL', text: 'Leite' })
 })
 
 test('Falta adds a new item when only other names are on the list', () => {
