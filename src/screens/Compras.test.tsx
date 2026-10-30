@@ -2,11 +2,12 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import Compras from './Compras'
 import { item, prod } from '../domain/testFactories'
-import type { Product, ShoppingItem } from '../domain/types'
+import type { FreezerBag, Product, ShoppingItem } from '../domain/types'
 
-const data = vi.hoisted(() => ({ shopping: [] as ShoppingItem[], products: [] as Product[] }))
+const data = vi.hoisted(() => ({ shopping: [] as ShoppingItem[], products: [] as Product[], bags: [] as FreezerBag[] }))
 vi.mock('../data/useCollection', () => ({
-  useCollection: (path: string) => (path === 'shopping' ? data.shopping : path === 'products' ? data.products : []),
+  useCollection: (path: string) =>
+    (path === 'shopping' ? data.shopping : path === 'products' ? data.products : path === 'freezerBags' ? data.bags : []),
 }))
 vi.mock('../data/session', () => ({ useSession: () => ({ uid: 'P', name: 'Ana', members: { P: 'Ana', B: 'Rui' } }) }))
 vi.mock('../hooks/useToday', () => ({ useToday: () => '2026-10-29' }))
@@ -19,9 +20,11 @@ vi.mock('../data/shoppingRepo', () => repo)
 vi.mock('../data/restore', () => ({ restore: vi.fn() }))
 const exp = vi.hoisted(() => ({ addExpense: vi.fn() }))
 vi.mock('../data/expensesRepo', () => exp)
+const freezer = vi.hoisted(() => ({ freezeBought: vi.fn(() => ['b1', 'b2']), deleteBags: vi.fn() }))
+vi.mock('../data/freezerRepo', () => freezer)
 
 const renderIt = () => render(<MemoryRouter><Compras /></MemoryRouter>)
-beforeEach(() => { vi.clearAllMocks(); data.products = [] })
+beforeEach(() => { vi.clearAllMocks(); data.products = []; data.bags = [] })
 
 test('"Terminar compras" only appears with something in the cart', () => {
   data.shopping = [item({ text: 'Café', status: 'porComprar' })]
@@ -126,4 +129,49 @@ test('the "how much" question appears where the cart was, not at the top of the 
   const question = screen.getByText(/Quanto foi/)
   const list = screen.getByText('Por comprar')
   expect(list.compareDocumentPosition(question) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+})
+
+const freezerCart = () => {
+  data.products = [prod({ id: 'v', name: 'Carne de vaca', location: 'congelador' })]
+  data.shopping = [item({ text: 'Carne de vaca', status: 'carrinho', productId: 'v' })]
+}
+
+test('finishing with Congelador products asks what went to the freezer, then how much it was', () => {
+  freezerCart()
+  renderIt()
+  fireEvent.click(screen.getByRole('button', { name: /Terminar compras/ }))
+  expect(screen.getByText(/Para o congelador/)).toBeTruthy()
+  expect(screen.queryByText(/Quanto foi/)).toBeNull()
+  fireEvent.change(screen.getByLabelText('Quantidade de Carne de vaca'), { target: { value: '5' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+  expect(freezer.freezeBought).toHaveBeenCalled()
+  expect(screen.queryByText(/Para o congelador/)).toBeNull()
+  expect(screen.getByText(/Quanto foi/)).toBeTruthy()
+})
+
+test('finishing without Congelador products goes straight to "Quanto foi?"', () => {
+  data.shopping = [item({ text: 'Café', status: 'carrinho' })]
+  renderIt()
+  fireEvent.click(screen.getByRole('button', { name: /Terminar compras/ }))
+  expect(screen.queryByText(/Para o congelador/)).toBeNull()
+  expect(screen.getByText(/Quanto foi/)).toBeTruthy()
+})
+
+test('Desfazer after saving the freezer card also deletes the new bags', () => {
+  freezerCart()
+  renderIt()
+  fireEvent.click(screen.getByRole('button', { name: /Terminar compras/ }))
+  fireEvent.change(screen.getByLabelText('Quantidade de Carne de vaca'), { target: { value: '5' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Desfazer' }))
+  expect(repo.undoFinish).toHaveBeenCalled()
+  expect(freezer.deleteBags).toHaveBeenCalledWith(['b1', 'b2'])
+  expect(screen.queryByText(/Quanto foi/)).toBeNull()
+})
+
+test('a Congelador product without bags shows in Talvez falte as "não há no congelador"', () => {
+  data.products = [prod({ id: 'v', name: 'Carne de vaca', location: 'congelador', boughtKeys: ['2026-10-01'] })]
+  data.shopping = []
+  renderIt()
+  expect(screen.getByText('não há no congelador')).toBeTruthy()
 })

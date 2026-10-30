@@ -1,14 +1,17 @@
-import { useCallback, useState, type FormEvent } from 'react'
+import { useCallback, useRef, useState, type FormEvent } from 'react'
 import { useCollection } from '../data/useCollection'
 import { useSession } from '../data/session'
 import { useToday } from '../hooks/useToday'
 import { addItem, classifyItem, deleteItem, finish, markMissing, snooze, toggleCart, undoFinish } from '../data/shoppingRepo'
 import { restore } from '../data/restore'
+import { deleteBags } from '../data/freezerRepo'
 import { backToCasa, maybeMissing } from '../domain/shopping'
+import { freezerInCart } from '../domain/freezer'
 import { GROUP_LABEL, groupByZone, guessZone, ZONES } from '../domain/zones'
-import type { Product, ShoppingItem, Zone } from '../domain/types'
+import type { FreezerBag, Product, ShoppingItem, Zone } from '../domain/types'
 import UndoToast from '../components/UndoToast'
 import SpentForm from '../components/SpentForm'
+import FreezeForm from '../components/FreezeForm'
 
 type ZonePick = Zone | 'oneOff'
 const PICKS: { value: ZonePick; short: string }[] = [...ZONES, { value: 'oneOff', short: 'Só desta vez' }]
@@ -30,19 +33,23 @@ export default function Compras() {
   const today = useToday()
   const items = useCollection<ShoppingItem>('shopping')
   const products = useCollection<Product>('products')
+  const bags = useCollection<FreezerBag>('freezerBags')
   const [text, setText] = useState('')
   const [msg, setMsg] = useState('')
   // a new name waits here for its zone (pre-selected guess) before anything is written
   const [guess, setGuess] = useState<Zone | null>(null)
   const [undo, setUndo] = useState<{ message: string; run: () => void } | null>(null)
   const closeUndo = useCallback(() => setUndo(null), [])
-  // after "Terminar compras": ask how much it was, straight into Gastos
+  // after "Terminar compras": first what went to the freezer, then how much it was (one card at a time)
+  const [freezing, setFreezing] = useState<Product[] | null>(null)
   const [askSpent, setAskSpent] = useState(false)
+  // bags saved from the freezer card; a ref so the undo created before them still sees them
+  const savedBags = useRef<string[]>([])
 
   const groups = groupByZone(items.filter(i => i.status === 'porComprar'), products)
   const todoCount = groups.reduce((n, g) => n + g.items.length, 0)
   const cart = items.filter(i => i.status === 'carrinho').sort((a, b) => a.text.localeCompare(b.text, 'pt-PT'))
-  const missing = maybeMissing(products, items, today)
+  const missing = maybeMissing(products, items, today, bags)
   const toCasa = backToCasa(items, products)
 
   function submit(e: FormEvent) {
@@ -65,9 +72,15 @@ export default function Compras() {
   }
 
   function terminate() {
+    const toFreeze = freezerInCart(items, products)
     const done = finish(items, products, today)
+    savedBags.current = []
+    setFreezing(toFreeze.length ? toFreeze : null)
     setAskSpent(true)
-    setUndo({ message: 'Compras terminadas', run: () => { undoFinish(done); setAskSpent(false) } })
+    setUndo({
+      message: 'Compras terminadas',
+      run: () => { undoFinish(done); deleteBags(savedBags.current); setFreezing(null); setAskSpent(false) },
+    })
   }
 
   const row = (i: ShoppingItem, picker = false) => (
@@ -118,24 +131,25 @@ export default function Compras() {
       {missing.length > 0 && (
         <div className="card">
           <div className="card-title">Talvez falte <span className="pill">{missing.length}</span></div>
-          {missing.map(m => {
-            const { product } = m
-            return (
-            <div className="row" key={product.id}>
+          {missing.map(m => (
+            <div className="row" key={m.product.id}>
               <div className="grow">
-                {product.name}
+                {m.product.name}
                 <div className="note">{m.reason === 'congelador' ? 'não há no congelador' : `costuma durar ~${m.gap} dias · vai em ${m.since}`}</div>
               </div>
-              <button className="btn small primary" onClick={() => markMissing(product, uid, items)}>Falta</button>
-              <button className="btn small" onClick={() => snooze(product, today)}>Ainda há</button>
+              <button className="btn small primary" onClick={() => markMissing(m.product, uid, items)}>Falta</button>
+              <button className="btn small" onClick={() => snooze(m.product, today)}>Ainda há</button>
             </div>
-            )
-          })}
+          ))}
         </div>
       )}
 
       {/* where the cart was, i.e. right under the finger that tapped "Terminar compras" */}
-      {askSpent && <SpentForm title="✓ Compras terminadas. Quanto foi?" today={today} onDone={() => setAskSpent(false)} />}
+      {freezing && (
+        <FreezeForm products={freezing} today={today}
+          onSaved={ids => { savedBags.current = [...savedBags.current, ...ids] }} onDone={() => setFreezing(null)} />
+      )}
+      {askSpent && !freezing && <SpentForm title="✓ Compras terminadas. Quanto foi?" today={today} onDone={() => setAskSpent(false)} />}
 
       {cart.length > 0 && (
         <>
