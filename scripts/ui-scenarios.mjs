@@ -243,6 +243,18 @@ export default {
     await page.goBack()
     await expectText(page, '+ Nova rotina', 'accepting leaves the editor')
     await shot(page, 'voltar-saiu')
+
+    // Apagar goes back in history: no repeated Rotinas entry
+    await page.getByRole('button', { name: '+ Nova rotina' }).click()
+    await page.getByLabel('Nome').fill('Rotina a apagar')
+    await page.getByRole('button', { name: 'Guardar' }).click()
+    await page.getByRole('button', { name: 'Editar' }).click()
+    page.once('dialog', d => d.accept())
+    await page.getByRole('button', { name: 'Apagar rotina' }).click()
+    await expectText(page, '+ Nova rotina', 'Apagar returns to the list')
+    await page.goBack()
+    await expectText(page, 'Rotinas e checklists', 'Back after Apagar lands on Mais, not on Rotinas again')
+    await shot(page, 'voltar-apagou')
     if (errors.length) throw new Error(`page errors: ${errors.join(' | ')}`)
   },
 }

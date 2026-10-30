@@ -34,7 +34,7 @@ export default function RotinaEditar() {
   const [draft, setDraft] = useState<Routine | null>(null)
   const [error, setError] = useState('')
   const editing = draft !== null
-  useUnsavedChanges(draft !== null && (isNew || JSON.stringify(draft) !== JSON.stringify(routine)))
+  const leave = useUnsavedChanges(draft !== null && (isNew || JSON.stringify(draft) !== JSON.stringify(routine)))
 
   if (!routine) return <p className="muted">A carregar…</p>
   const mine = routine.ownerUid === uid
@@ -102,11 +102,11 @@ export default function RotinaEditar() {
         <div className="inline" style={{ justifyContent: 'space-between', marginTop: 8 }}>
           <button className="link-btn" onClick={() => {
             setDraft(null)
-            if (isNew) navigate('/mais/rotinas', { replace: true })
+            if (isNew) leave('/mais/rotinas')
             else navigate(`/mais/rotinas/${id}`, { replace: true })
           }}>Cancelar</button>
           {!isNew && <button className="link-btn" style={{ color: 'var(--danger)' }}
-            onClick={async () => { if (confirm('Apagar esta rotina?')) { deleteRoutine(id); navigate('/mais/rotinas', { replace: true }) } }}>Apagar rotina</button>}
+            onClick={async () => { if (confirm('Apagar esta rotina?')) { deleteRoutine(id); leave('/mais/rotinas') } }}>Apagar rotina</button>}
         </div>
       </>
     )

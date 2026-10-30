@@ -19,7 +19,7 @@ export default function Checklist() {
   const myRoutines = useCollection<Routine>('routines', ['ownerUid', '==', uid])
   const [draft, setDraft] = useState<ChecklistT | null>(null)
   const [newItem, setNewItem] = useState('')
-  useUnsavedChanges(draft !== null && (isNew || newItem.trim() !== '' || JSON.stringify(draft) !== JSON.stringify(list)))
+  const leave = useUnsavedChanges(draft !== null && (isNew || newItem.trim() !== '' || JSON.stringify(draft) !== JSON.stringify(list)))
 
   if (!list) return <p className="muted">A carregar…</p>
   const mine = list.ownerUid === uid
@@ -59,11 +59,11 @@ export default function Checklist() {
         <div className="inline" style={{ justifyContent: 'space-between', marginTop: 8 }}>
           <button className="link-btn" onClick={() => {
             setDraft(null)
-            if (isNew) navigate('/mais/rotinas', { replace: true })
+            if (isNew) leave('/mais/rotinas')
             else navigate(`/mais/checklists/${id}`, { replace: true })
           }}>Cancelar</button>
           {!isNew && <button className="link-btn" style={{ color: 'var(--danger)' }}
-            onClick={async () => { if (confirm('Apagar esta checklist?')) { deleteChecklist(id, myRoutines); navigate('/mais/rotinas', { replace: true }) } }}>Apagar checklist</button>}
+            onClick={async () => { if (confirm('Apagar esta checklist?')) { deleteChecklist(id, myRoutines); leave('/mais/rotinas') } }}>Apagar checklist</button>}
         </div>
       </>
     )
