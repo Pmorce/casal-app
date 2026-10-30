@@ -5,7 +5,7 @@ import { useToday } from '../hooks/useToday'
 import { addProduct, boughtOutside, deleteProduct, markMissing, moveProduct, renameProduct, setFreezerCategory, snooze, undoBought } from '../data/shoppingRepo'
 import { restore } from '../data/restore'
 import { checkRename } from '../domain/pantry'
-import { rhythmOf, stockStatus, type StockStatus } from '../domain/rhythm'
+import { MAX_SNOOZES, rhythmOf, stockStatus, type StockStatus } from '../domain/rhythm'
 import { bagsOfProduct, bagsSummary, unlinkOrphans } from '../domain/freezer'
 import SpentForm from '../components/SpentForm'
 import FreezeForm from '../components/FreezeForm'
@@ -123,6 +123,7 @@ export default function Casa() {
                       {p.name} <span className="zone-tag">{ZONE_SHORT[p.location]}</span>
                       <div className="note">
                         {p.location === 'congelador' ? freezerNote(p, bags, st.value) : st.value === 'talvez' ? lateNote(p, today) : rhythmNote(p, today)}
+                        {(p.snoozeCount ?? 0) >= MAX_SNOOZES && ' · não sugiro até voltarem a comprar'}
                       </div>
                     </div>
                     {st.value !== 'falta' && (

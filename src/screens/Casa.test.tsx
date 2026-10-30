@@ -140,3 +140,13 @@ test('several Comprei in a row gather the Congelador products in one card; Desfa
   expect(screen.queryByLabelText('Quantidade de Gelado')).toBeNull()
   expect(screen.getByLabelText('Quantidade de Vaca')).toBeTruthy()
 })
+
+test('a product snoozed 3 times says it is no longer suggested', () => {
+  data.products = [
+    prod({ id: 'c', name: 'Café', boughtKeys: ['2026-09-01', '2026-09-11', '2026-09-21'], snoozeCount: 3 }),
+    prod({ id: 'a', name: 'Arroz', boughtKeys: ['2026-10-01'], snoozeCount: 1 }),
+  ]
+  renderIt()
+  expect(screen.getAllByText(/não sugiro até voltarem a comprar/)).toHaveLength(1)
+  expect(screen.getByText(/não sugiro até voltarem a comprar/).closest('.row')?.textContent).toMatch(/Café/)
+})
