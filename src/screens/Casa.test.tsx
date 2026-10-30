@@ -1,27 +1,29 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import Casa from './Casa'
-import { item, prod } from '../domain/testFactories'
-import type { Product, ShoppingItem } from '../domain/types'
+import { bag, item, prod } from '../domain/testFactories'
+import type { FreezerBag, Product, ShoppingItem } from '../domain/types'
 
-const data = vi.hoisted(() => ({ shopping: [] as ShoppingItem[], products: [] as Product[] }))
+const data = vi.hoisted(() => ({ shopping: [] as ShoppingItem[], products: [] as Product[], bags: [] as FreezerBag[] }))
 vi.mock('../data/useCollection', () => ({
-  useCollection: (path: string) => (path === 'shopping' ? data.shopping : path === 'products' ? data.products : []),
+  useCollection: (path: string) =>
+    (path === 'shopping' ? data.shopping : path === 'products' ? data.products : path === 'freezerBags' ? data.bags : []),
 }))
 vi.mock('../data/session', () => ({ useSession: () => ({ uid: 'P', name: 'Ana', members: { P: 'Ana', B: 'Rui' } }) }))
 vi.mock('../hooks/useToday', () => ({ useToday: () => '2026-10-29' }))
 const repo = vi.hoisted(() => ({
   addProduct: vi.fn(), deleteProduct: vi.fn(), renameProduct: vi.fn(), moveProduct: vi.fn(),
-  markMissing: vi.fn(), undoBought: vi.fn(), snooze: vi.fn(),
+  markMissing: vi.fn(), undoBought: vi.fn(), snooze: vi.fn(), setFreezerCategory: vi.fn(),
   boughtOutside: vi.fn((p: unknown) => ({ product: p, items: [] })),
 }))
 vi.mock('../data/shoppingRepo', () => repo)
 vi.mock('../data/restore', () => ({ restore: vi.fn() }))
 const exp = vi.hoisted(() => ({ addExpense: vi.fn() }))
 vi.mock('../data/expensesRepo', () => exp)
+vi.mock('../data/freezerRepo', () => ({ freezeBought: vi.fn(() => []) }))
 
 const renderIt = () => render(<MemoryRouter><Casa /></MemoryRouter>)
-beforeEach(() => { vi.clearAllMocks(); data.products = []; data.shopping = [] })
+beforeEach(() => { vi.clearAllMocks(); data.products = []; data.shopping = []; data.bags = [] })
 
 test('each product shows its rhythm and has Falta and Comprei', () => {
   data.products = [prod({ id: 'c', name: 'Café', boughtKeys: ['2026-10-09', '2026-10-19'] })]
@@ -64,4 +66,56 @@ test('"Comprei" offers to record the spending without forcing it', () => {
   fireEvent.change(screen.getByPlaceholderText(/47,30/), { target: { value: '3,20' } })
   fireEvent.click(screen.getByRole('button', { name: 'Registar' }))
   expect(exp.addExpense).toHaveBeenCalledWith(320, 'P', '2026-10-29')
+})
+
+test('Congelador products show their bags instead of a rhythm', () => {
+  data.products = [prod({ id: 'v', name: 'Vaca', location: 'congelador', boughtKeys: ['2026-10-01'] })]
+  data.bags = [bag({ productId: 'v', amount: 1, unit: 'kg' }), bag({ productId: 'v', amount: 1, unit: 'kg' })]
+  renderIt()
+  expect(screen.getByText('2 sacos · 2 kg')).toBeTruthy()
+  expect(screen.queryByText(/a aprender/)).toBeNull()
+})
+
+test('a bought Congelador product with no bags is 🟠 Talvez falte, "não há no congelador"', () => {
+  data.products = [prod({ id: 'v', name: 'Vaca', location: 'congelador', boughtKeys: ['2026-10-01'] })]
+  renderIt()
+  expect(screen.getByRole('heading', { level: 3 }).textContent).toBe('🟠 Talvez falte (1)')
+  expect(screen.getByText('não há no congelador')).toBeTruthy()
+})
+
+test('Comprei on a Congelador product records the purchase and opens Para o congelador', () => {
+  data.products = [prod({ id: 'v', name: 'Vaca', location: 'congelador' })]
+  renderIt()
+  fireEvent.click(screen.getByRole('button', { name: 'Comprei Vaca' }))
+  expect(repo.boughtOutside).toHaveBeenCalled()
+  expect(screen.getByText(/Para o congelador/)).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Agora não' }))
+  expect(screen.queryByText(/Para o congelador/)).toBeNull()
+  expect(repo.undoBought).not.toHaveBeenCalled()
+})
+
+test('Comprei on other zones does not open Para o congelador', () => {
+  data.products = [prod({ id: 'c', name: 'Café' })]
+  renderIt()
+  fireEvent.click(screen.getByRole('button', { name: 'Comprei Café' }))
+  expect(screen.queryByText(/Para o congelador/)).toBeNull()
+})
+
+test('Editar lets a Congelador product switch between Carne / peixe and Outros', () => {
+  data.products = [prod({ id: 'g', name: 'Gelado', location: 'congelador' }), prod({ id: 'c', name: 'Café' })]
+  renderIt()
+  fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
+  expect((screen.getByLabelText('Tipo de Gelado') as HTMLSelectElement).value).toBe('outros')
+  expect(screen.queryByLabelText('Tipo de Café')).toBeNull()
+  fireEvent.change(screen.getByLabelText('Tipo de Gelado'), { target: { value: 'carne' } })
+  expect(repo.setFreezerCategory).toHaveBeenCalledWith(expect.objectContaining({ id: 'g' }), 'carne')
+})
+
+test('Desfazer after Comprei closes an unanswered Para o congelador', () => {
+  data.products = [prod({ id: 'v', name: 'Vaca', location: 'congelador' })]
+  renderIt()
+  fireEvent.click(screen.getByRole('button', { name: 'Comprei Vaca' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Desfazer' }))
+  expect(repo.undoBought).toHaveBeenCalled()
+  expect(screen.queryByText(/Para o congelador/)).toBeNull()
 })

@@ -2,14 +2,16 @@ import { useCallback, useState, type FormEvent } from 'react'
 import { useCollection } from '../data/useCollection'
 import { useSession } from '../data/session'
 import { useToday } from '../hooks/useToday'
-import { addProduct, boughtOutside, deleteProduct, markMissing, moveProduct, renameProduct, snooze, undoBought } from '../data/shoppingRepo'
+import { addProduct, boughtOutside, deleteProduct, markMissing, moveProduct, renameProduct, setFreezerCategory, snooze, undoBought } from '../data/shoppingRepo'
 import { restore } from '../data/restore'
 import { checkRename } from '../domain/pantry'
 import { rhythmOf, stockStatus, type StockStatus } from '../domain/rhythm'
+import { bagsOfProduct, bagsSummary } from '../domain/freezer'
 import SpentForm from '../components/SpentForm'
-import { ZONES } from '../domain/zones'
+import FreezeForm from '../components/FreezeForm'
+import { freezerCategoryOf, ZONES } from '../domain/zones'
 import type { DateKey } from '../domain/dates'
-import type { Product, ShoppingItem, Zone } from '../domain/types'
+import type { FreezerBag, Product, ShoppingItem, Zone } from '../domain/types'
 import UndoToast from '../components/UndoToast'
 
 const STATUS: { value: StockStatus; title: string }[] = [
@@ -33,11 +35,18 @@ function rhythmNote(p: Product, today: DateKey): string {
   return gap === null ? `${ago} · a aprender` : `${ago} · dura ~${gap}`
 }
 
+/** Congelador products are known by their bags, not by a rhythm. */
+function freezerNote(p: Product, bags: FreezerBag[]): string {
+  const mine = bagsOfProduct(p, bags)
+  return mine.length ? bagsSummary(mine) : 'não há no congelador'
+}
+
 export default function Casa() {
   const { uid } = useSession()
   const today = useToday()
   const products = useCollection<Product>('products')
   const items = useCollection<ShoppingItem>('shopping')
+  const bags = useCollection<FreezerBag>('freezerBags')
   const [name, setName] = useState('')
   const [location, setLocation] = useState<Zone>('frigorifico')
   const [msg, setMsg] = useState('')
@@ -45,6 +54,8 @@ export default function Casa() {
   const [undo, setUndo] = useState<{ message: string; run: () => void; action?: { label: string; run: () => void } } | null>(null)
   const closeUndo = useCallback(() => setUndo(null), [])
   const [spentFor, setSpentFor] = useState<string | null>(null)
+  // "Comprei" on a Congelador product also asks how much went in (closing it does not undo the purchase)
+  const [freezing, setFreezing] = useState<Product | null>(null)
 
   function submit(e: FormEvent) {
     e.preventDefault()
@@ -64,9 +75,10 @@ export default function Casa() {
   function bought(p: Product) {
     const done = boughtOutside(p, items, today)
     setSpentFor(null)
+    setFreezing(p.location === 'congelador' ? p : null)
     setUndo({
       message: `«${p.name}» comprado`,
-      run: () => undoBought(done),
+      run: () => { undoBought(done); setFreezing(null) },
       // offered, not forced: several "Comprei" in a row are often one single purchase
       action: { label: 'Registar gasto', run: () => setSpentFor(p.name) },
     })
@@ -82,6 +94,7 @@ export default function Casa() {
         {editing ? 'Muda o nome ou o sítio; o nome grava ao sair da caixa.' : '"Falta" põe na lista. "Comprei" é para o que compraram fora da lista.'}
       </p>
 
+      {freezing && <FreezeForm key={freezing.id} products={[freezing]} today={today} onSaved={() => {}} onDone={() => setFreezing(null)} />}
       {spentFor && <SpentForm title={`Quanto custou «${spentFor}»?`} today={today} onDone={() => setSpentFor(null)} />}
 
       {editing ? ZONES.map(zone => {
@@ -97,7 +110,7 @@ export default function Casa() {
         <>
           {!products.length && <p className="small muted">Sem produtos ainda.</p>}
           {STATUS.map(st => {
-            const list = byName(products.filter(p => stockStatus(p, items, today) === st.value))
+            const list = byName(products.filter(p => stockStatus(p, items, today, bags) === st.value))
             if (!list.length) return null
             return (
               <div className="card" key={st.value}>
@@ -106,7 +119,9 @@ export default function Casa() {
                   <div className="row" key={p.id}>
                     <div className="grow">
                       {p.name} <span className="zone-tag">{ZONE_SHORT[p.location]}</span>
-                      <div className="note">{st.value === 'talvez' ? lateNote(p, today) : rhythmNote(p, today)}</div>
+                      <div className="note">
+                        {p.location === 'congelador' ? freezerNote(p, bags) : st.value === 'talvez' ? lateNote(p, today) : rhythmNote(p, today)}
+                      </div>
                     </div>
                     {st.value !== 'falta' && (
                       <button className="btn small" aria-label={`Falta ${p.name}`} onClick={() => markMissing(p, uid, items)}>Falta</button>
@@ -163,6 +178,13 @@ function EditRow({ product, products, items, onDelete }: { product: Product; pro
         onChange={e => moveProduct(product, e.target.value as Zone)} style={{ width: 'auto', flex: 'none' }}>
         {ZONES.map(z => <option key={z.value} value={z.value}>{z.short}</option>)}
       </select>
+      {product.location === 'congelador' && (
+        <select className="input" aria-label={`Tipo de ${product.name}`} value={freezerCategoryOf(product)}
+          onChange={e => setFreezerCategory(product, e.target.value as 'carne' | 'outros')} style={{ width: 'auto', flex: 'none' }}>
+          <option value="carne">Carne / peixe</option>
+          <option value="outros">Outros</option>
+        </select>
+      )}
       <button className="link-btn" onClick={onDelete}>Apagar</button>
       {error && <p className="small error" style={{ width: '100%', margin: 0 }}>{error}</p>}
     </div>
