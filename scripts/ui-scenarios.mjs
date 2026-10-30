@@ -148,4 +148,26 @@ export default {
       await shot(page, `hoje-${day}`)
     }
   },
+
+  // Bug 2026-10-30: Casa → Comprei → Registar gasto → Registar left a black screen.
+  async comprei({ login, shot, expectText }) {
+    await (await import('./ui-admin.mjs')).resetDb()
+    const a = await login('ana')
+    a.page.on('console', m => m.type() === 'error' && console.log('[console]', m.text()))
+    await a.page.goto(a.page.url().split('#')[0] + '#/casa')
+    await a.page.getByPlaceholder('Nome (ex.: Leite)').fill('Café')
+    await a.page.getByRole('button', { name: 'Despensa' }).click()
+    await a.page.getByRole('button', { name: 'Adicionar' }).click()
+    await expectText(a.page, 'Café', 'product created')
+    await a.page.getByRole('button', { name: 'Comprei Café' }).click()
+    await a.page.waitForTimeout(400)
+    await a.page.screenshot({ path: process.argv[3] + '/comprei-offer.png' })
+    await a.page.getByRole('button', { name: 'Registar gasto' }).click()
+    await a.page.getByPlaceholder('Valor (ex.: 47,30)').fill('3,20')
+    await shot(a.page, 'comprei-before')
+    await a.page.getByRole('button', { name: 'Registar', exact: true }).click()
+    await a.page.waitForTimeout(1500)
+    await shot(a.page, 'comprei-after')
+    await expectText(a.page, '🟢 Há', 'Casa still on screen after registering')
+  },
 }

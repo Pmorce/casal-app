@@ -8,21 +8,34 @@ export interface UndoToastProps {
   action?: { label: string; run: () => void }
 }
 
-/** Shows for 5 s with a "Desfazer" button (8 s when it also offers an action, to leave time to read it). */
+/**
+ * Shows for 5 s with a "Desfazer" button. When it offers an action it is a question, so it stays
+ * (highlighted) until answered or dismissed — a 5 s toast was easy to miss.
+ */
 export default function UndoToast({ message, onUndo, onClose, action }: UndoToastProps) {
-  const ms = action ? 8000 : 5000
   useEffect(() => {
-    const t = setTimeout(onClose, ms)
+    if (action) return
+    const t = setTimeout(onClose, 5000)
     return () => clearTimeout(t)
-  }, [message, onClose, ms])
+  }, [message, onClose, action])
+
+  if (action) {
+    return (
+      <div className="toast offer">
+        <span>{message}</span>
+        <span className="toast-actions">
+          <button className="toast-main" onClick={() => { action.run(); onClose() }}>{action.label}</button>
+          <button onClick={() => { onUndo(); onClose() }}>Desfazer</button>
+          <button aria-label="Fechar" onClick={onClose}>✕</button>
+        </span>
+      </div>
+    )
+  }
 
   return (
     <div className="toast">
       <span>{message}</span>
-      <span>
-        {action && <button onClick={() => { action.run(); onClose() }}>{action.label}</button>}
-        <button onClick={() => { onUndo(); onClose() }}>Desfazer</button>
-      </span>
+      <button onClick={() => { onUndo(); onClose() }}>Desfazer</button>
     </div>
   )
 }

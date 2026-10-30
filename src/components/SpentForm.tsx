@@ -11,7 +11,8 @@ export default function SpentForm({ title, today, onDone }: { title: string; tod
   const [who, setWho] = useState(uid)
   const [error, setError] = useState('')
   const form = useRef<HTMLFormElement>(null)
-  useEffect(() => form.current?.scrollIntoView?.({ block: 'center', behavior: 'smooth' }), [])
+  // braces matter: recent Chromium returns a Promise here, and React would call it as the cleanup (black screen)
+  useEffect(() => { form.current?.scrollIntoView?.({ block: 'center', behavior: 'smooth' }) }, [])
 
   function submit(e: FormEvent) {
     e.preventDefault()
