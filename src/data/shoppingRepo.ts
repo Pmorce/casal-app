@@ -51,9 +51,14 @@ export function classifyItem(item: ShoppingItem, zone: Zone | 'oneOff', products
   fire(batch.commit())
 }
 
-/** "Falta": straight onto the list, unless it is already there. */
+/**
+ * "Falta": straight onto the list, unless it is already there — linked, or as a loose item with the same name
+ * (old, "sem zona" or "só desta vez"), which then gets linked instead of duplicated.
+ */
 export function markMissing(p: Product, uid: string, items: ShoppingItem[]): void {
   if (items.some(i => i.productId === p.id)) return
+  const loose = items.find(i => !i.productId && normalize(i.text) === normalize(p.name))
+  if (loose) return fire(updateDoc(doc(db, 'shopping', loose.id), { productId: p.id, oneOff: deleteField() }))
   fire(addDoc(collection(db, 'shopping'), { text: p.name, addedBy: uid, status: 'porComprar', productId: p.id, createdAt: serverTimestamp() }))
 }
 

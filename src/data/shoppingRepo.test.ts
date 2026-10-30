@@ -1,4 +1,4 @@
-import { addItem, boughtOutside, finish, setFreezerCategory, undoFinish } from './shoppingRepo'
+import { addItem, boughtOutside, finish, markMissing, setFreezerCategory, undoFinish } from './shoppingRepo'
 import { item, prod } from '../domain/testFactories'
 
 const fs = vi.hoisted(() => ({
@@ -88,4 +88,23 @@ test('undoFinish puts the items back and deletes rhythm fields that did not exis
 test('setFreezerCategory updates only that field', () => {
   setFreezerCategory(prod({ id: 'g' }), 'carne')
   expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'products/g' }), { freezerCategory: 'carne' })
+})
+
+test('Falta links an unlinked item with the same name instead of adding another', () => {
+  const cafe = prod({ id: 'c', name: 'Café' })
+  markMissing(cafe, 'P', [item({ id: 'i1', text: 'café ', status: 'porComprar' })])
+  expect(fs.addDoc).not.toHaveBeenCalled()
+  expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'shopping/i1' }), { productId: 'c', oneOff: 'DEL' })
+})
+
+test('Falta also links a same-name item already in the cart', () => {
+  markMissing(prod({ id: 'c', name: 'Café' }), 'P', [item({ id: 'i2', text: 'Café', status: 'carrinho', oneOff: true })])
+  expect(fs.addDoc).not.toHaveBeenCalled()
+  expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'shopping/i2' }), { productId: 'c', oneOff: 'DEL' })
+})
+
+test('Falta adds a new item when only other names are on the list', () => {
+  markMissing(prod({ id: 'c', name: 'Café' }), 'P', [item({ text: 'Chá' })])
+  expect(fs.addDoc).toHaveBeenCalledTimes(1)
+  expect(fs.updateDoc).not.toHaveBeenCalled()
 })
