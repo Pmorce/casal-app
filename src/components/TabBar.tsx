@@ -1,5 +1,4 @@
 import { NavLink } from 'react-router-dom'
-import { confirmLeave } from '../hooks/useUnsavedChanges'
 
 const TABS = [
   { to: '/', icon: '🏠', label: 'Hoje' },
@@ -9,12 +8,12 @@ const TABS = [
   { to: '/mais', icon: '☰', label: 'Mais' },
 ]
 
+/** Leaving an editor with unsaved changes asks first (see useUnsavedChanges). */
 export default function TabBar() {
   return (
     <nav className="tabbar">
       {TABS.map(t => (
-        <NavLink key={t.to} to={t.to} end={t.to === '/'} className={({ isActive }) => (isActive ? 'tab on' : 'tab')}
-          onClick={e => { if (!confirmLeave()) e.preventDefault() }}>
+        <NavLink key={t.to} to={t.to} end={t.to === '/'} className={({ isActive }) => (isActive ? 'tab on' : 'tab')}>
           <span className="tab-icon">{t.icon}</span>
           {t.label}
         </NavLink>

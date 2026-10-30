@@ -1,21 +1,23 @@
 import { useEffect } from 'react'
+import { useBlocker } from 'react-router-dom'
 
-let dirty = false
-
-/** Editors flag unsaved changes; leaving through the tab bar (or closing the app) then asks first. */
+/**
+ * Editors flag unsaved changes; leaving then asks first — through the tab bar, the Android Back button,
+ * or closing the app. Save/Cancel/Apagar navigate with `replace`, which is never blocked.
+ */
 export function useUnsavedChanges(isDirty: boolean): void {
+  const blocker = useBlocker(({ historyAction }) => isDirty && historyAction !== 'REPLACE')
+
   useEffect(() => {
-    dirty = isDirty
+    if (blocker.state !== 'blocked') return
+    if (confirm('Tens alterações por guardar. Sair mesmo assim?')) blocker.proceed()
+    else blocker.reset()
+  }, [blocker])
+
+  useEffect(() => {
     if (!isDirty) return
     const onUnload = (e: BeforeUnloadEvent) => e.preventDefault()
     window.addEventListener('beforeunload', onUnload)
-    return () => {
-      dirty = false
-      window.removeEventListener('beforeunload', onUnload)
-    }
+    return () => window.removeEventListener('beforeunload', onUnload)
   }, [isDirty])
-}
-
-export function confirmLeave(): boolean {
-  return !dirty || confirm('Tens alterações por guardar. Sair mesmo assim?')
 }

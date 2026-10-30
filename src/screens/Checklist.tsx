@@ -63,7 +63,7 @@ export default function Checklist() {
             else navigate(`/mais/checklists/${id}`, { replace: true })
           }}>Cancelar</button>
           {!isNew && <button className="link-btn" style={{ color: 'var(--danger)' }}
-            onClick={async () => { if (confirm('Apagar esta checklist?')) { deleteChecklist(id, myRoutines); navigate('/mais/rotinas') } }}>Apagar checklist</button>}
+            onClick={async () => { if (confirm('Apagar esta checklist?')) { deleteChecklist(id, myRoutines); navigate('/mais/rotinas', { replace: true }) } }}>Apagar checklist</button>}
         </div>
       </>
     )

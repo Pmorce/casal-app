@@ -106,7 +106,7 @@ export default function RotinaEditar() {
             else navigate(`/mais/rotinas/${id}`, { replace: true })
           }}>Cancelar</button>
           {!isNew && <button className="link-btn" style={{ color: 'var(--danger)' }}
-            onClick={async () => { if (confirm('Apagar esta rotina?')) { deleteRoutine(id); navigate('/mais/rotinas') } }}>Apagar rotina</button>}
+            onClick={async () => { if (confirm('Apagar esta rotina?')) { deleteRoutine(id); navigate('/mais/rotinas', { replace: true }) } }}>Apagar rotina</button>}
         </div>
       </>
     )

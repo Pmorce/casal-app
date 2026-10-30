@@ -1,4 +1,4 @@
-import { HashRouter, Route, Routes, useLocation } from 'react-router-dom'
+import { createHashRouter, Outlet, RouterProvider, useLocation } from 'react-router-dom'
 import { SessionProvider } from './data/session'
 import TabBar from './components/TabBar'
 import OfflineBadge from './components/OfflineBadge'
@@ -11,31 +11,37 @@ import Mais from './screens/Mais'
 import './styles.css'
 
 /** The screens, guarded: an error shows "Algo correu mal" and switching tab clears it (the tab bar stays outside). */
-function AppRoutes() {
+function Layout() {
   const { pathname } = useLocation()
   return (
-    <ErrorBoundary resetKey={pathname}>
-      <Routes>
-        <Route path="/" element={<Hoje />} />
-        <Route path="/compras" element={<Compras />} />
-        <Route path="/congelador" element={<Congelador />} />
-        <Route path="/casa" element={<Casa />} />
-        <Route path="/mais/*" element={<Mais />} />
-      </Routes>
-    </ErrorBoundary>
+    <>
+      <main className="app">
+        <OfflineBadge />
+        <ErrorBoundary resetKey={pathname}>
+          <Outlet />
+        </ErrorBoundary>
+      </main>
+      <TabBar />
+    </>
   )
 }
+
+// a data router, so editors can stop the Android Back button from losing unsaved changes (useBlocker)
+const router = createHashRouter([{
+  element: <Layout />,
+  children: [
+    { path: '/', element: <Hoje /> },
+    { path: '/compras', element: <Compras /> },
+    { path: '/congelador', element: <Congelador /> },
+    { path: '/casa', element: <Casa /> },
+    { path: '/mais/*', element: <Mais /> },
+  ],
+}])
 
 export default function App() {
   return (
     <SessionProvider>
-      <HashRouter>
-        <main className="app">
-          <OfflineBadge />
-          <AppRoutes />
-        </main>
-        <TabBar />
-      </HashRouter>
+      <RouterProvider router={router} />
     </SessionProvider>
   )
 }
