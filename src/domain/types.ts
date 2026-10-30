@@ -14,7 +14,7 @@ export interface ShoppingItem {
 }
 
 /** Casa zone; also how the shopping list is grouped in the supermarket. */
-export type Zone = 'frigorifico' | 'despensa' | 'limpeza'
+export type Zone = 'frigorifico' | 'congelador' | 'despensa' | 'limpeza'
 
 export interface Product {
   id: string
@@ -26,17 +26,24 @@ export interface Product {
   snoozedUntil?: DateKey
   /** "Ainda há" taps since the last purchase */
   snoozeCount?: number
+  /** zone congelador only: which freezer tab its bags go to (else guessed from the name) */
+  freezerCategory?: 'carne' | 'outros'
+  /** zone congelador only: amount of the last entry, to pre-fill the next one */
+  freezerLast?: { amount: number; unit: FreezerUnit }
 }
 
 export type FreezerUnit = 'un' | 'g' | 'kg' | 'doses'
+export type FreezerCategory = 'carne' | 'feita' | 'outros'
 
 export interface FreezerBag {
   id: string
   name: string
-  category: 'carne' | 'feita'
+  category: FreezerCategory
   amount: number
   unit: FreezerUnit
   addedKey: DateKey
+  /** the Casa product it came from (bags from purchases); missing on hand-made and legacy bags */
+  productId?: string
   createdAt?: unknown
 }
 

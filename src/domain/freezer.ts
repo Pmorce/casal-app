@@ -1,11 +1,11 @@
 import { daysBetween, type DateKey } from './dates'
 import { normalize } from './shopping'
-import type { FreezerBag } from './types'
+import type { FreezerBag, FreezerCategory } from './types'
 
 export interface FreezerGroup {
   key: string
   name: string
-  category: 'carne' | 'feita'
+  category: FreezerCategory
   /** oldest first */
   bags: FreezerBag[]
 }
