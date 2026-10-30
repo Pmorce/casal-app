@@ -26,7 +26,7 @@ beforeEach(() => { vi.clearAllMocks(); data.products = []; data.shopping = []; d
 
 const openSplit = (name: string) => {
   fireEvent.click(screen.getByText(name))
-  fireEvent.click(screen.getByRole('button', { name: 'Dividir' }))
+  fireEvent.click(screen.getByRole('button', { name: /^Dividir o saco 1/ }))
 }
 
 test('three tabs, Outros shows its bags', () => {
@@ -110,4 +110,51 @@ test('last bag with no product still adds the name to the list', () => {
   fireEvent.click(screen.getByRole('button', { name: 'Tirar um saco de Sopa' }))
   fireEvent.click(screen.getByRole('button', { name: 'Sim' }))
   expect(shop.addItem).toHaveBeenCalledWith('Sopa', 'P', [], [], 'despensa')
+})
+
+test('each bag has its own button names (screen readers)', () => {
+  data.bags = [bag({ name: 'Vaca', amount: 1, unit: 'kg', addedKey: '2026-10-29' }), bag({ name: 'Vaca', amount: 1, unit: 'kg', addedKey: '2026-10-29' })]
+  renderIt()
+  fireEvent.click(screen.getByText('Vaca'))
+  for (const verb of ['Corrigir', 'Dividir', 'Apagar']) {
+    expect(screen.getByRole('button', { name: `${verb} o saco 1 (1 kg, entrou hoje)` })).toBeTruthy()
+    expect(screen.getByRole('button', { name: `${verb} o saco 2 (1 kg, entrou hoje)` })).toBeTruthy()
+  }
+})
+
+test('a typed amount per bag shows the new total when it differs', () => {
+  data.bags = [bag({ name: 'Vaca', amount: 1, unit: 'kg' })]
+  renderIt()
+  openSplit('Vaca')
+  expect(screen.queryByText(/Total/)).toBeNull()
+  fireEvent.change(screen.getByLabelText('Quantidade por saco'), { target: { value: '0,4' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Mais sacos' }))
+  expect(screen.getByText('Total: 1,2 kg (era 1 kg)')).toBeTruthy()
+})
+
+test('tiny amounts cannot be split into more bags than hundredths', () => {
+  const b = bag({ name: 'Sal', amount: 0.03, unit: 'kg' })
+  data.bags = [b]
+  renderIt()
+  openSplit('Sal')
+  fireEvent.click(screen.getByRole('button', { name: 'Mais sacos' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Mais sacos' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Dividir em 3' }))
+  expect(freezer.splitBag).toHaveBeenCalledWith(b, [0.01, 0.01, 0.01])
+})
+
+test('a bag of 0,01 offers no Dividir', () => {
+  data.bags = [bag({ name: 'Sal', amount: 0.01, unit: 'kg' })]
+  renderIt()
+  fireEvent.click(screen.getByText('Sal'))
+  expect(screen.queryByRole('button', { name: /^Dividir/ })).toBeNull()
+})
+
+test('if the split is refused, it says so instead of doing nothing', () => {
+  freezer.splitBag.mockImplementationOnce(() => { throw new Error('Quantidade inválida') })
+  data.bags = [bag({ name: 'Vaca', amount: 2, unit: 'kg' })]
+  renderIt()
+  openSplit('Vaca')
+  fireEvent.click(screen.getByRole('button', { name: 'Dividir em 2' }))
+  expect(screen.getByText('Não foi possível dividir: Quantidade inválida')).toBeTruthy()
 })

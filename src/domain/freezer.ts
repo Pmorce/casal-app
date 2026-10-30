@@ -85,12 +85,19 @@ export function unlinkOrphans(bags: FreezerBag[], products: Product[]): FreezerB
   })
 }
 
-/** "Dividir": equal parts with 2 decimals; the last one takes the rounding so the total stays exact. */
+/**
+ * "Dividir": equal parts in whole hundredths, so no bag is ever empty and the total stays exact;
+ * the hundredths left over go one each to the last bags.
+ */
 export function splitAmounts(total: number, count: number): number[] {
-  const part = round2(total / count)
-  const parts = Array.from({ length: count - 1 }, () => part)
-  return [...parts, round2(total - part * (count - 1))]
+  const hundredths = Math.round(total * 100)
+  const base = Math.floor(hundredths / count)
+  const extra = hundredths % count
+  return Array.from({ length: count }, (_, i) => (base + (i >= count - extra ? 1 : 0)) / 100)
 }
+
+/** How many bags a bag can be split into: up to 20, and never less than 0,01 each. */
+export const maxSplit = (total: number): number => Math.min(20, Math.round(total * 100))
 
 /** What the "Para o congelador" row starts with: the last entry, else kg for meat and units for the rest. */
 export function freezeDefaults(p: Product): { amount: string; unit: FreezerUnit } {

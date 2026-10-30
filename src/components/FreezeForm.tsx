@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { freezeBought } from '../data/freezerRepo'
+import { freezeBought, type FrozenBatch } from '../data/freezerRepo'
 import { freezeDefaults, parseAmount } from '../domain/freezer'
 import type { DateKey } from '../domain/dates'
 import type { FreezerUnit, Product } from '../domain/types'
@@ -16,8 +16,8 @@ interface Edit { amount?: string; unit?: FreezerUnit; invalid?: boolean }
 interface Props {
   products: Product[]
   today: DateKey
-  /** ids of the bags just created, so the screen can undo them */
-  onSaved: (bagIds: string[]) => void
+  /** what was just saved, so the screen can undo it */
+  onSaved: (done: FrozenBatch) => void
   onDone: () => void
 }
 

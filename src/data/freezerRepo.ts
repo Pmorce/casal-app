@@ -1,4 +1,4 @@
-import { collection, deleteDoc, doc, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore'
+import { collection, deleteDoc, deleteField, doc, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore'
 import { db } from './firebase'
 import { fire } from './write'
 import { cleanText } from '../domain/shopping'
@@ -59,11 +59,21 @@ export function updateBag(b: FreezerBag, changes: Partial<Pick<FreezerBag, 'amou
 
 export const deleteBag = (id: string) => fire(deleteDoc(doc(db, 'freezerBags', id)))
 
+export interface FrozenBatch {
+  bagIds: string[]
+  /** each product's last amount before, so undo can put it back */
+  previous: { id: string; freezerLast?: Product['freezerLast'] }[]
+}
+
+const setFreezerLast = (id: string, freezerLast: Product['freezerLast']) =>
+  // quiet: if the product was deleted meanwhile the bags are still saved, which is what matters
+  fire(updateDoc(doc(db, 'products', id), { freezerLast: freezerLast ?? deleteField() }), { quiet: true })
+
 /**
  * "Para o congelador": one bag per product, as it came from the shop, linked to it. The bags go in one batch;
  * each product's last amount is updated on its own, so a product deleted meanwhile does not take the bags down.
  */
-export function freezeBought(rows: { product: Product; amount: number; unit: FreezerUnit }[], today: DateKey): string[] {
+export function freezeBought(rows: { product: Product; amount: number; unit: FreezerUnit }[], today: DateKey): FrozenBatch {
   const batch = writeBatch(db)
   const ids = rows.map(({ product, amount, unit }) => {
     const ref = newBagRef()
@@ -73,8 +83,13 @@ export function freezeBought(rows: { product: Product; amount: number; unit: Fre
     return ref.id
   })
   fire(batch.commit())
-  rows.forEach(({ product, amount, unit }) => fire(updateDoc(doc(db, 'products', product.id), { freezerLast: { amount, unit, key: today } })))
-  return ids
+  rows.forEach(({ product, amount, unit }) => setFreezerLast(product.id, { amount, unit, key: today }))
+  return { bagIds: ids, previous: rows.map(({ product }) => ({ id: product.id, freezerLast: product.freezerLast })) }
+}
+
+export function undoFreeze(done: FrozenBatch): void {
+  deleteBags(done.bagIds)
+  done.previous.forEach(p => setFreezerLast(p.id, p.freezerLast))
 }
 
 /** "Dividir": the bag becomes one bag per amount, same entry date, tab and link. Returns the new ids for undo. */
@@ -82,6 +97,8 @@ export function splitBag(b: FreezerBag, amounts: number[]): string[] {
   if (amounts.length < 2 || amounts.length > 20) throw new Error('Nº de sacos inválido')
   if (amounts.some(a => !(a > 0))) throw new Error('Quantidade inválida')
   const batch = writeBatch(db)
+  // fails the whole batch if the other phone already took this bag out: otherwise the split would bring it back
+  batch.update(doc(db, 'freezerBags', b.id), { splitAt: serverTimestamp() })
   batch.delete(doc(db, 'freezerBags', b.id))
   const ids = amounts.map(amount => {
     const ref = newBagRef()

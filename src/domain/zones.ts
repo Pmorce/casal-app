@@ -25,6 +25,9 @@ const GROUP_ORDER: ListGroup[] = ['frigorifico', 'congelador', 'despensa', 'limp
 const MEAT = ['carne', 'frango', 'peru', 'porco', 'vaca', 'novilho', 'borrego', 'coelho', 'pato', 'bife', 'febra', 'lombo',
   'entrecosto', 'costeleta', 'hamburguer', 'almondega', 'peixe', 'salmao', 'pescada', 'bacalhau', 'dourada', 'robalo',
   'sardinha', 'carapau', 'camarao', 'lula', 'polvo']
+// checked before the meat words: "fiambre de peru" lives in the fridge, "caldo de carne" in the pantry
+const COLD_CUTS = ['fiambre', 'presunto', 'chourico', 'salsicha', 'mortadela', 'paio', 'salpicao', 'fatiad']
+const SHELF = ['caldo', 'conserva', 'enlatad', 'lata']
 const FROZEN = ['congelad', 'gelado', 'pizza', 'douradinho', 'lasanha']
 const FRIDGE = ['leite', 'iogurte', 'queijo', 'fiambre', 'manteiga', 'natas', 'ovo', 'chourico', 'salsicha', 'presunto',
   'mozzarella', 'requeijao', 'kefir', 'fruta', 'maca', 'banana', 'laranja', 'pera', 'uva', 'morango', 'kiwi', 'legume',
@@ -38,6 +41,8 @@ const has = (name: string, words: string[]) => words.some(w => new RegExp(String
 /** First guess for a new product's zone; the person confirms it with one tap. */
 export function guessZone(name: string): Zone {
   const n = normalize(name)
+  if (has(n, COLD_CUTS)) return 'frigorifico'
+  if (has(n, SHELF)) return 'despensa'
   if (has(n, MEAT) || has(n, FROZEN)) return 'congelador'
   if (has(n, FRIDGE)) return 'frigorifico'
   if (has(n, CLEANING)) return 'limpeza'

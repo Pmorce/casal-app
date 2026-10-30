@@ -51,3 +51,12 @@ test('Congelador comes right after Frigorífico in the list', () => {
   const g = groupByZone([item({ productId: 'd' }), item({ productId: 'c' }), item({ productId: 'f' })], products)
   expect(g.map(x => x.group)).toEqual(['frigorifico', 'congelador', 'despensa'])
 })
+
+test('cold cuts stay in the fridge and stock or tins in the pantry, even with a meat word', () => {
+  expect(guessZone('Fiambre de peru')).toBe('frigorifico')
+  expect(guessZone('Peito de peru fatiado')).toBe('frigorifico')
+  expect(guessZone('Chouriço de carne')).toBe('frigorifico')
+  expect(guessZone('Caldo de carne')).toBe('despensa')
+  expect(guessZone('Atum em conserva')).toBe('despensa')
+  expect(guessZone('Carne de vaca')).toBe('congelador')
+})

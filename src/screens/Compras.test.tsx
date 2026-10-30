@@ -20,11 +20,12 @@ vi.mock('../data/shoppingRepo', () => repo)
 vi.mock('../data/restore', () => ({ restore: vi.fn() }))
 const exp = vi.hoisted(() => ({ addExpense: vi.fn() }))
 vi.mock('../data/expensesRepo', () => exp)
-const freezer = vi.hoisted(() => ({ freezeBought: vi.fn(() => ['b1', 'b2']), deleteBags: vi.fn() }))
+const frozen = { bagIds: ['b1', 'b2'], previous: [] }
+const freezer = vi.hoisted(() => ({ freezeBought: vi.fn((): unknown => null), undoFreeze: vi.fn() }))
 vi.mock('../data/freezerRepo', () => freezer)
 
 const renderIt = () => render(<MemoryRouter><Compras /></MemoryRouter>)
-beforeEach(() => { vi.clearAllMocks(); data.products = []; data.bags = [] })
+beforeEach(() => { vi.clearAllMocks(); data.products = []; data.bags = []; freezer.freezeBought.mockReturnValue(frozen) })
 
 test('"Terminar compras" only appears with something in the cart', () => {
   data.shopping = [item({ text: 'Café', status: 'porComprar' })]
@@ -165,7 +166,7 @@ test('Desfazer after saving the freezer card also deletes the new bags', () => {
   fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
   fireEvent.click(screen.getByRole('button', { name: 'Desfazer' }))
   expect(repo.undoFinish).toHaveBeenCalled()
-  expect(freezer.deleteBags).toHaveBeenCalledWith(['b1', 'b2'])
+  expect(freezer.undoFreeze).toHaveBeenCalledWith(frozen)
   expect(screen.queryByText(/Quanto foi/)).toBeNull()
 })
 
@@ -174,4 +175,17 @@ test('a Congelador product without bags shows in Talvez falte as "não há no co
   data.shopping = []
   renderIt()
   expect(screen.getByText('não há no congelador')).toBeTruthy()
+})
+
+test('finishing again with the freezer card open adds the new products to it, keeping what was typed', () => {
+  freezerCart()
+  const { rerender } = renderIt()
+  fireEvent.click(screen.getByRole('button', { name: /Terminar compras/ }))
+  fireEvent.change(screen.getByLabelText('Quantidade de Carne de vaca'), { target: { value: '5' } })
+  data.products = [...data.products, prod({ id: 'g', name: 'Gelado', location: 'congelador' })]
+  data.shopping = [item({ text: 'Gelado', status: 'carrinho', productId: 'g' })]
+  rerender(<MemoryRouter><Compras /></MemoryRouter>)
+  fireEvent.click(screen.getByRole('button', { name: /Terminar compras/ }))
+  expect((screen.getByLabelText('Quantidade de Carne de vaca') as HTMLInputElement).value).toBe('5')
+  expect(screen.getByLabelText('Quantidade de Gelado')).toBeTruthy()
 })

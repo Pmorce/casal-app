@@ -201,7 +201,7 @@ export default {
     await page.goto(base + '#/congelador')
     await expectText(page, '1 saco · 5 kg', 'one bag of 5 kg in the freezer')
     await page.getByText('Carne de vaca').click()
-    await page.getByRole('button', { name: 'Dividir', exact: true }).click()
+    await page.getByRole('button', { name: /^Dividir o saco 1/ }).click()
     await page.getByRole('button', { name: 'Dividir em 5' }).click()
     await expectText(page, '5 sacos · 5 kg', 'split in 5 bags')
     await shot(page, 'cc-3-dividido')

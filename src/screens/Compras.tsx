@@ -4,7 +4,7 @@ import { useSession } from '../data/session'
 import { useToday } from '../hooks/useToday'
 import { addItem, classifyItem, deleteItem, finish, markMissing, snooze, toggleCart, undoFinish } from '../data/shoppingRepo'
 import { restore } from '../data/restore'
-import { deleteBags } from '../data/freezerRepo'
+import { undoFreeze, type FrozenBatch } from '../data/freezerRepo'
 import { backToCasa, maybeMissing } from '../domain/shopping'
 import { freezerInCart, unlinkOrphans } from '../domain/freezer'
 import { GROUP_LABEL, groupByZone, guessZone, ZONES } from '../domain/zones'
@@ -44,7 +44,7 @@ export default function Compras() {
   const [freezing, setFreezing] = useState<Product[] | null>(null)
   const [askSpent, setAskSpent] = useState(false)
   // bags saved from the freezer card; a ref so the undo created before them still sees them
-  const savedBags = useRef<string[]>([])
+  const savedBags = useRef<FrozenBatch[]>([])
 
   const groups = groupByZone(items.filter(i => i.status === 'porComprar'), products)
   const todoCount = groups.reduce((n, g) => n + g.items.length, 0)
@@ -75,11 +75,15 @@ export default function Compras() {
     const toFreeze = freezerInCart(items, products)
     const done = finish(items, products, today)
     savedBags.current = []
-    setFreezing(toFreeze.length ? toFreeze : null)
+    // a second "Terminar" with the card still open adds to it (what was typed stays)
+    setFreezing(open => {
+      const all = [...(open ?? []), ...toFreeze.filter(p => !open?.some(o => o.id === p.id))]
+      return all.length ? all : null
+    })
     setAskSpent(true)
     setUndo({
       message: 'Compras terminadas',
-      run: () => { undoFinish(done); deleteBags(savedBags.current); setFreezing(null); setAskSpent(false) },
+      run: () => { undoFinish(done); savedBags.current.forEach(b => undoFreeze(b)); setFreezing(null); setAskSpent(false) },
     })
   }
 
@@ -147,7 +151,7 @@ export default function Compras() {
       {/* where the cart was, i.e. right under the finger that tapped "Terminar compras" */}
       {freezing && (
         <FreezeForm products={freezing} today={today}
-          onSaved={ids => { savedBags.current = [...savedBags.current, ...ids] }} onDone={() => setFreezing(null)} />
+          onSaved={batch => { savedBags.current = [...savedBags.current, batch] }} onDone={() => setFreezing(null)} />
       )}
       {askSpent && !freezing && <SpentForm title="✓ Compras terminadas. Quanto foi?" today={today} onDone={() => setAskSpent(false)} />}
 

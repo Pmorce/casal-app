@@ -2,7 +2,8 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import FreezeForm from './FreezeForm'
 import { prod } from '../domain/testFactories'
 
-const repo = vi.hoisted(() => ({ freezeBought: vi.fn((_rows: unknown, _today: string) => ['n1']) }))
+const batch = { bagIds: ['n1'], previous: [] }
+const repo = vi.hoisted(() => ({ freezeBought: vi.fn((_rows: unknown, _today: string): unknown => null) }))
 vi.mock('../data/freezerRepo', () => repo)
 
 const vaca = prod({ id: 'v', name: 'Vaca', location: 'congelador', freezerLast: { amount: 2.5, unit: 'kg' } })
@@ -11,7 +12,7 @@ const renderIt = (onSaved = vi.fn(), onDone = vi.fn()) => {
   render(<FreezeForm products={[vaca, gelado]} today="2026-10-30" onSaved={onSaved} onDone={onDone} />)
   return { onSaved, onDone }
 }
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => { vi.clearAllMocks(); repo.freezeBought.mockReturnValue(batch) })
 
 test('pre-fills from the last entry and saves one bag per product', () => {
   const { onSaved, onDone } = renderIt()
@@ -22,7 +23,7 @@ test('pre-fills from the last entry and saves one bag per product', () => {
   expect(repo.freezeBought).toHaveBeenCalledWith([
     { product: vaca, amount: 2.5, unit: 'kg' }, { product: gelado, amount: 4, unit: 'un' },
   ], '2026-10-30')
-  expect(onSaved).toHaveBeenCalledWith(['n1'])
+  expect(onSaved).toHaveBeenCalledWith(batch)
   expect(onDone).toHaveBeenCalled()
 })
 
@@ -40,7 +41,7 @@ test('an invalid row stays marked and does not block the others', () => {
   fireEvent.change(screen.getByLabelText('Quantidade de Gelado'), { target: { value: 'abc' } })
   fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
   expect(repo.freezeBought).toHaveBeenCalledWith([{ product: vaca, amount: 2, unit: 'kg' }], '2026-10-30')
-  expect(onSaved).toHaveBeenCalledWith(['n1'])
+  expect(onSaved).toHaveBeenCalledWith(batch)
   expect(onDone).not.toHaveBeenCalled()
   expect(screen.queryByLabelText('Quantidade de Vaca')).toBeNull()
   expect(screen.getByLabelText('Quantidade de Gelado')).toBeTruthy()

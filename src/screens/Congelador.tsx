@@ -6,7 +6,7 @@ import { addSameAsLast, deleteBag, deleteBags, removeOldest, restoreBag, splitBa
 import { addItem, markMissing, snooze } from '../data/shoppingRepo'
 import { guessZone } from '../domain/zones'
 import { findProduct } from '../domain/shopping'
-import { CATEGORIES, groupBags, isOld, parseAmount, splitAmounts, summary, type FreezerGroup } from '../domain/freezer'
+import { CATEGORIES, groupBags, isOld, maxSplit, parseAmount, splitAmounts, summary, type FreezerGroup } from '../domain/freezer'
 import { daysBetween, type DateKey } from '../domain/dates'
 import type { FreezerBag, Product, ShoppingItem } from '../domain/types'
 import UndoToast from '../components/UndoToast'
@@ -110,18 +110,24 @@ export default function Congelador() {
               <button className="icon-btn" aria-label={`Tirar um saco de ${g.name}`} onClick={() => minus(g)}>−</button>
               <button className="icon-btn" aria-label={`Mais um saco de ${g.name}`} onClick={() => addSameAsLast(g, today)}>+</button>
             </div>
-            {open === g.key && g.bags.map(b => fixing === b.id ? (
-              <FixBag key={b.id} bag={b} today={today} onDone={() => setFixing(null)} />
-            ) : splitting === b.id ? (
-              <SplitBag key={b.id} bag={b} onSplit={amounts => split(b, amounts)} onCancel={() => setSplitting(null)} />
-            ) : (
-              <div className="row small" key={b.id}>
-                <span className="grow">{num.format(b.amount)} {UNIT_LABEL[b.unit]} · entrou {age(b.addedKey, today)}</span>
-                <button className="link-btn" onClick={() => { setSplitting(null); setFixing(b.id) }}>Corrigir</button>
-                <button className="link-btn" onClick={() => { setFixing(null); setSplitting(b.id) }}>Dividir</button>
-                <button className="link-btn" onClick={() => { deleteBag(b.id); setUndo({ message: 'Saco apagado', run: () => restoreBag(b) }) }}>Apagar</button>
-              </div>
-            ))}
+            {open === g.key && g.bags.map((b, i) => {
+              if (fixing === b.id) return <FixBag key={b.id} bag={b} today={today} onDone={() => setFixing(null)} />
+              if (splitting === b.id) return <SplitBag key={b.id} bag={b} onSplit={amounts => split(b, amounts)} onCancel={() => setSplitting(null)} />
+              const what = `${num.format(b.amount)} ${UNIT_LABEL[b.unit]}, entrou ${age(b.addedKey, today)}`
+              // distinct names: a group often has several identical bags (screen readers)
+              const label = (verb: string) => `${verb} o saco ${i + 1} (${what})`
+              return (
+                <div className="row small" key={b.id}>
+                  <span className="grow">{num.format(b.amount)} {UNIT_LABEL[b.unit]} · entrou {age(b.addedKey, today)}</span>
+                  <button className="link-btn" aria-label={label('Corrigir')} onClick={() => { setSplitting(null); setFixing(b.id) }}>Corrigir</button>
+                  {maxSplit(b.amount) >= 2 && (
+                    <button className="link-btn" aria-label={label('Dividir')} onClick={() => { setFixing(null); setSplitting(b.id) }}>Dividir</button>
+                  )}
+                  <button className="link-btn" aria-label={label('Apagar')}
+                    onClick={() => { deleteBag(b.id); setUndo({ message: 'Saco apagado', run: () => restoreBag(b) }) }}>Apagar</button>
+                </div>
+              )
+            })}
           </div>
         )
       })}
@@ -133,19 +139,24 @@ export default function Congelador() {
 
 /** "Dividir": when the pack is split at home. Equal parts by default (total kept exact); the amount can be typed. */
 function SplitBag({ bag, onSplit, onCancel }: { bag: FreezerBag; onSplit: (amounts: number[]) => void; onCancel: () => void }) {
-  const whole = Number.isInteger(bag.amount) && bag.amount > 1 && bag.amount <= 20
-  const [count, setCount] = useState(whole ? bag.amount : 2)
-  // null = untouched: follows the count, and the last bag takes the rounding
+  const most = maxSplit(bag.amount)
+  const whole = Number.isInteger(bag.amount) && bag.amount > 1
+  const [count, setCount] = useState(Math.min(most, whole ? bag.amount : 2))
+  // null = untouched: follows the count, and the last bags take the rounding
   const [typed, setTyped] = useState<string | null>(null)
   const [error, setError] = useState('')
   const parts = splitAmounts(bag.amount, count)
+  const typedAmount = typed === null ? null : parseAmount(typed)
+  const newTotal = typedAmount === null ? null : Math.round(typedAmount * count * 100) / 100
 
   function save(e: FormEvent) {
     e.preventDefault()
-    if (typed === null) return onSplit(parts)
-    const n = parseAmount(typed)
-    if (n === null) return setError('Quantidade inválida')
-    onSplit(Array.from({ length: count }, () => n))
+    if (typed !== null && typedAmount === null) return setError('Quantidade inválida')
+    try {
+      onSplit(typedAmount === null ? parts : Array.from({ length: count }, () => typedAmount))
+    } catch (err) {
+      setError(`Não foi possível dividir: ${(err as Error).message}`)
+    }
   }
 
   return (
@@ -153,12 +164,15 @@ function SplitBag({ bag, onSplit, onCancel }: { bag: FreezerBag; onSplit: (amoun
       <div className="inline" style={{ alignItems: 'center' }}>
         <button type="button" className="icon-btn" aria-label="Menos sacos" onClick={() => setCount(Math.max(2, count - 1))}>−</button>
         <strong style={{ minWidth: 24, textAlign: 'center' }}>{count}</strong>
-        <button type="button" className="icon-btn" aria-label="Mais sacos" onClick={() => setCount(Math.min(20, count + 1))}>+</button>
+        <button type="button" className="icon-btn" aria-label="Mais sacos" onClick={() => setCount(Math.min(most, count + 1))}>+</button>
         <span>sacos de</span>
         <input className="input" inputMode="decimal" aria-label="Quantidade por saco" value={typed ?? ptNum(parts[0])}
           onChange={e => { setTyped(e.target.value); setError('') }} style={{ flex: 1, minWidth: 0 }} />
         <span>{UNIT_LABEL[bag.unit]}</span>
       </div>
+      {newTotal !== null && newTotal !== bag.amount && (
+        <p className="note">Total: {ptNum(newTotal)} {UNIT_LABEL[bag.unit]} (era {ptNum(bag.amount)} {UNIT_LABEL[bag.unit]})</p>
+      )}
       {error && <p className="error">{error}</p>}
       <div className="inline" style={{ justifyContent: 'flex-end' }}>
         <button type="button" className="link-btn" onClick={onCancel}>Cancelar</button>

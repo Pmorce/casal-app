@@ -1,4 +1,4 @@
-import { parseAmount, summary, groupBags, oldestBag, isOld, bagsOfProduct, splitAmounts, freezeDefaults, freezerInCart, unlinkOrphans } from './freezer'
+import { parseAmount, summary, groupBags, oldestBag, isOld, bagsOfProduct, splitAmounts, freezeDefaults, freezerInCart, unlinkOrphans, maxSplit } from './freezer'
 import { bag, item, prod } from './testFactories'
 
 const group = (bags: ReturnType<typeof bag>[]) => groupBags(bags)[0]
@@ -54,7 +54,7 @@ test('bagsOfProduct: linked bags, plus legacy bags with the same name in the sam
 test('splitAmounts keeps the total exact with 2 decimals', () => {
   expect(splitAmounts(5, 5)).toEqual([1, 1, 1, 1, 1])
   expect(splitAmounts(1, 3)).toEqual([0.33, 0.33, 0.34])
-  expect(splitAmounts(2, 3)).toEqual([0.67, 0.67, 0.66])
+  expect(splitAmounts(2, 3)).toEqual([0.66, 0.67, 0.67])
 })
 
 test('freezeDefaults uses the last entry, else kg for meat and un. for the rest', () => {
@@ -78,4 +78,16 @@ test('bags of a deleted product count again by name (unlinkOrphans)', () => {
   const bags = unlinkOrphans([bag({ name: 'Vaca', category: 'carne', productId: 'gone' }), bag({ name: 'Vaca', productId: 'new' })], [vaca])
   expect(bags[0]).not.toHaveProperty('productId')
   expect(bagsOfProduct(vaca, bags)).toHaveLength(2)
+})
+
+test('splitAmounts never makes an empty bag: whole hundredths, extras on the last bags', () => {
+  expect(splitAmounts(0.1, 8)).toEqual([0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.02, 0.02])
+  expect(splitAmounts(0.5, 14).every(a => a > 0)).toBe(true)
+  expect(Math.round(splitAmounts(0.5, 14).reduce((s, a) => s + a, 0) * 100)).toBe(50)
+})
+
+test('maxSplit: at most 20 bags, and never below 0,01 each', () => {
+  expect(maxSplit(5)).toBe(20)
+  expect(maxSplit(0.1)).toBe(10)
+  expect(maxSplit(0.01)).toBe(1)
 })
