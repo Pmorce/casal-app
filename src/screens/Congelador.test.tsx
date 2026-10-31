@@ -234,3 +234,10 @@ test('the group stepper live region announces the count with its product', () =>
   expect(live.querySelector('.sr-only')?.textContent).toBe('2 sacos de Vaca')
   expect(live.querySelector('[aria-hidden="true"]')?.textContent).toBe('2')
 })
+
+test('the group stepper live region says «1 saco» in the singular', () => {
+  data.bags = [bag({ name: 'Bolonhesa', amount: 5, unit: 'kg' })]
+  renderIt()
+  const live = screen.getByRole('button', { name: 'Mais um saco de Bolonhesa' }).previousElementSibling!
+  expect(live.querySelector('.sr-only')?.textContent).toBe('1 saco de Bolonhesa')
+})

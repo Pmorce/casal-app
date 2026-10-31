@@ -118,7 +118,7 @@ export default function Congelador() {
                 {/* − {bags} +: one round selector, its buttons keep a 44px hit area */}
                 <span className="stepper">
                   <button aria-label={`Tirar um saco de ${g.name}`} onClick={() => minus(g)}><Icon name="menos" /></button>
-                  <b aria-live="polite" aria-atomic="true"><span aria-hidden="true">{g.bags.length}</span><span className="sr-only">{g.bags.length} sacos de {g.name}</span></b>
+                  <b aria-live="polite" aria-atomic="true"><span aria-hidden="true">{g.bags.length}</span><span className="sr-only">{g.bags.length} {g.bags.length === 1 ? 'saco' : 'sacos'} de {g.name}</span></b>
                   <button aria-label={`Mais um saco de ${g.name}`} onClick={() => addSameAsLast(g, today)}><Icon name="mais1" /></button>
                 </span>
               </div>

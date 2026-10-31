@@ -150,7 +150,7 @@ h2 { font-size: 16px; font-weight: 800; margin: 18px 0 8px; }
 
 /* controls; the small ones keep a 44px hit area through ::after */
 .check { position: relative; width: 24px; height: 24px; flex: none; border: 2px solid var(--control-line); border-radius: 50%; background: var(--card); padding: 0; display: grid; place-items: center; color: var(--on-accent); font-size: 14px; font-weight: 800; cursor: pointer; transition: background-color .15s, border-color .15s; }
-.check::after { content: ''; position: absolute; inset: -10px; }
+.check::after { content: ''; position: absolute; inset: -12px; }
 .check.on { background: var(--accent); border-color: var(--accent); }
 .check svg { width: 14px; height: 14px; stroke-width: 2.6; }
 .check:disabled { opacity: .55; cursor: default; }
