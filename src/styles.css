@@ -6,6 +6,7 @@
   --text: #3B2A35;
   --muted: #7A6570;
   --line: #E7DCE0;
+  --control-line: #9C8A93; /* empty tick circle: 3:1 on --bg and --card (WCAG 1.4.11) */
   --wash: #F7F0F2;
   --accent: #C8708A;
   --accent-strong: #B35473;
@@ -45,6 +46,7 @@
     --text: #F6E9EC;
     --muted: #B39CA6;
     --line: #4A3A41;
+    --control-line: #85707A;
     --wash: #33282D;
     --accent: #EDA3B6;
     --accent-strong: #EDA3B6;
@@ -143,7 +145,7 @@ h2 { font-size: 16px; font-weight: 800; margin: 18px 0 8px; }
 .status-dot.ha { background: var(--dot-ha); }
 
 /* controls; the small ones keep a 44px hit area through ::after */
-.check { position: relative; width: 24px; height: 24px; flex: none; border: 2px solid var(--line); border-radius: 50%; background: var(--card); padding: 0; display: grid; place-items: center; color: var(--on-accent); font-size: 14px; font-weight: 800; cursor: pointer; transition: background-color .15s, border-color .15s; }
+.check { position: relative; width: 24px; height: 24px; flex: none; border: 2px solid var(--control-line); border-radius: 50%; background: var(--card); padding: 0; display: grid; place-items: center; color: var(--on-accent); font-size: 14px; font-weight: 800; cursor: pointer; transition: background-color .15s, border-color .15s; }
 .check::after { content: ''; position: absolute; inset: -10px; }
 .check.on { background: var(--accent); border-color: var(--accent); }
 .check svg { width: 14px; height: 14px; stroke-width: 2.6; }

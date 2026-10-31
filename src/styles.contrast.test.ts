@@ -31,6 +31,10 @@ describe.each([['light', light], ['dark', dark]] as const)('%s theme', (_, t) =>
     for (const bg of ['--bg', '--card', '--wash']) expect(contrast(t[fg], t[bg]), `${fg} on ${bg}`).toBeGreaterThanOrEqual(4.5)
   })
 
+  test('the empty tick circle is visible on bg and card (3:1 for controls)', () => {
+    for (const bg of ['--bg', '--card']) expect(contrast(t['--control-line'], t[bg]), `--control-line on ${bg}`).toBeGreaterThanOrEqual(3)
+  })
+
   test('accent-ink reads on accent-soft (chips, the active segment)', () => {
     expect(contrast(t['--accent-ink'], t['--accent-soft'])).toBeGreaterThanOrEqual(4.5)
   })
