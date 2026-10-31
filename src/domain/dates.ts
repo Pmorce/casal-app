@@ -2,6 +2,7 @@ export type DateKey = string
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6
 
 export const WEEKDAY_LABELS_PT = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
+const MONTH_LABELS_PT = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro']
 
 const TZ = 'Europe/Lisbon'
 const DAY_MS = 86_400_000
@@ -24,6 +25,12 @@ function utcMsToKey(ms: number): DateKey {
 
 export function weekdayOf(key: DateKey): Weekday {
   return new Date(keyToUtcMs(key)).getUTCDay() as Weekday
+}
+
+/** «Sexta, 31 de outubro». */
+export function longDate(key: DateKey): string {
+  const [, m, d] = key.split('-').map(Number)
+  return `${WEEKDAY_LABELS_PT[weekdayOf(key)]}, ${d} de ${MONTH_LABELS_PT[m - 1]}`
 }
 
 export function addDays(key: DateKey, n: number): DateKey {

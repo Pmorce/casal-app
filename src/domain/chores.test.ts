@@ -1,4 +1,4 @@
-import { choreDue } from './chores'
+import { choreDue, dueChores } from './chores'
 import { chore } from './testFactories'
 
 describe('weekly chore (Saturday)', () => {
@@ -36,4 +36,14 @@ test('one-off chore disappears once done', () => {
 test('weekly chore missed for a whole week is still flagged overdue on its next day', () => {
   const sab = chore({ kind: 'semanal', weekday: 6, lastDoneKey: '2026-10-24' }) // missed 31/10
   expect(choreDue(sab, '2026-11-07')).toEqual({ visible: true, overdue: true })
+})
+
+test('dueChores lists overdue chores first, then by title, and hides the done ones', () => {
+  const list = dueChores([
+    chore({ title: 'Regar' }),
+    chore({ title: 'Aspirar', lastDoneKey: '2026-10-29' }),
+    chore({ title: 'Lixo', kind: 'semanal', weekday: 1, createdKey: '2026-10-01' }),
+    chore({ title: 'Banho ao cão' }),
+  ], '2026-10-29')
+  expect(list.map(x => `${x.c.title}${x.overdue ? '!' : ''}`)).toEqual(['Lixo!', 'Banho ao cão', 'Regar'])
 })

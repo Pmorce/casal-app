@@ -1,4 +1,4 @@
-import { todayKey, weekdayOf, addDays, daysBetween, msUntilNextMidnight, nextDateCheck, lisbonHour } from './dates'
+import { todayKey, weekdayOf, addDays, daysBetween, msUntilNextMidnight, nextDateCheck, lisbonHour, longDate } from './dates'
 
 describe('todayKey (Europe/Lisbon)', () => {
   test('summer: 23:30 UTC is already the next day in Lisbon', () => {
@@ -37,4 +37,9 @@ test('nextDateCheck waits until just after midnight, but never more than an hour
 test('lisbonHour is the Lisbon wall-clock hour', () => {
   expect(lisbonHour(new Date('2026-07-01T22:30:00Z'))).toBe(23)
   expect(lisbonHour(new Date('2026-01-01T00:10:00Z'))).toBe(0)
+})
+
+test('longDate spells the day out in Portuguese', () => {
+  expect(longDate('2026-10-30')).toBe('Sexta, 30 de outubro')
+  expect(longDate('2027-03-01')).toBe('Segunda, 1 de março')
 })

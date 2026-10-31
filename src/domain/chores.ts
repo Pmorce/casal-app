@@ -14,3 +14,12 @@ export function choreDue(c: Chore, today: DateKey): { visible: boolean; overdue:
   const missedPrevious = previous >= c.createdKey && (!c.lastDoneKey || c.lastDoneKey < previous)
   return { visible, overdue: visible && (occurrence < today || missedPrevious) }
 }
+
+/** The chores to show today: overdue first, then by title. */
+export function dueChores(chores: Chore[], today: DateKey): { c: Chore; overdue: boolean }[] {
+  return chores
+    .map(c => ({ c, ...choreDue(c, today) }))
+    .filter(x => x.visible)
+    .sort((a, b) => Number(b.overdue) - Number(a.overdue) || a.c.title.localeCompare(b.c.title, 'pt-PT'))
+    .map(({ c, overdue }) => ({ c, overdue }))
+}

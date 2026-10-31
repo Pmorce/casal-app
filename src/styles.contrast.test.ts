@@ -46,6 +46,11 @@ describe.each([['light', light], ['dark', dark]] as const)('%s theme', (_, t) =>
     for (const stop of stops) expect(contrast(t['--hero-muted'], stop), stop).toBeGreaterThanOrEqual(4.5)
   })
 
+  test('the Hoje tiles read on their tones (pêssego text is --warn)', () => {
+    expect(contrast(t['--warn'], t['--pessego-bg'])).toBeGreaterThanOrEqual(4.5)
+    expect(contrast(t['--ceu'], t['--ceu-bg'])).toBeGreaterThanOrEqual(4.5)
+  })
+
   test('the undo toast action reads on the toast (--text background)', () => {
     expect(contrast(t['--accent-inverse'], t['--text'])).toBeGreaterThanOrEqual(4.5)
   })

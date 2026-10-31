@@ -2,7 +2,7 @@
 export default {
   async shell({ login, shot, expectText }) {
     const { ctx, page } = await login('ana')
-    await expectText(page, 'Olá Ana', 'Ana sees greeting')
+    await expectText(page, /^(Bom dia|Boa tarde|Boa noite), Ana$/, 'Ana sees greeting')
     await expectText(page, 'Congelador', 'tab bar visible')
     await ctx.setOffline(true)
     await page.evaluate(() => window.dispatchEvent(new Event('offline')))
@@ -84,7 +84,7 @@ export default {
     await expectText(b.page, 'Acordar + água', 'Rui sees today\'s steps')
     await b.page.getByRole('button', { name: 'Acordar + água' }).click()
     await b.page.getByRole('button', { name: 'Pequeno-almoço' }).click()
-    await expectText(b.page, '2/2', 'morning counter 2/2')
+    await expectText(b.page, '2 de 2 feitos', 'morning counter 2 de 2')
     await shot(b.page, 'hoje-rui')
 
     const p = await login('ana')

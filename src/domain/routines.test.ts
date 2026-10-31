@@ -1,4 +1,4 @@
-import { stepsFor, dayStatus, monthHistory, checkDocId, unlinkChecklist, stepsWithoutDays } from './routines'
+import { stepsFor, dayStatus, monthHistory, checkDocId, unlinkChecklist, stepsWithoutDays, routineProgress } from './routines'
 import { routine, step } from './testFactories'
 
 const r = routine({
@@ -51,4 +51,16 @@ test('unlinkChecklist drops the link from steps that open a deleted checklist', 
 
 test('stepsWithoutDays lists named steps that would never show up', () => {
   expect(stepsWithoutDays([step({ text: 'Creme', days: [] }), step({ text: '', days: [] }), step({ text: 'Ok' })])).toEqual(['Creme'])
+})
+
+test('routineProgress counts the ticked steps of one period across routines', () => {
+  const a = routine({ id: 'a', steps: [step({ id: 'x' }), step({ id: 'y' }), step({ id: 'n', period: 'noite' })] })
+  const b = routine({ id: 'b', steps: [step({ id: 'z' })] })
+  const checks = [
+    { id: 'a_d', ownerUid: 'B', routineId: 'a', dateKey: '2026-10-29', doneStepIds: ['x', 'n'] },
+    { id: 'b_old', ownerUid: 'B', routineId: 'b', dateKey: '2026-10-28', doneStepIds: ['z'] },
+  ]
+  const p = routineProgress([a, b], checks, '2026-10-29', 'manha')
+  expect([p.done, p.total]).toEqual([1, 3])
+  expect(p.rows.map(x => `${x.s.id}${x.on ? '+' : ''}`)).toEqual(['x+', 'y', 'z'])
 })

@@ -16,6 +16,15 @@ export function stepsFor(routine: Routine, day: DateKey, period: Step['period'])
   return stepsOfDay(routine, day).filter(s => s.period === period)
 }
 
+export type RoutineRow = { r: Routine; s: Step; on: boolean }
+
+/** One person's steps for a period today, ticked or not, with the count (Hoje's cards and moment line). */
+export function routineProgress(routines: Routine[], checks: RoutineCheck[], day: DateKey, period: Step['period']): { rows: RoutineRow[]; done: number; total: number } {
+  const doneIds = (r: Routine) => checks.find(c => c.routineId === r.id && c.dateKey === day)?.doneStepIds ?? []
+  const rows = routines.flatMap(r => stepsFor(r, day, period).map(s => ({ r, s, on: doneIds(r).includes(s.id) })))
+  return { rows, done: rows.filter(x => x.on).length, total: rows.length }
+}
+
 export function dayStatus(routine: Routine, day: DateKey, doneStepIds: string[]): DayStatus {
   const steps = stepsOfDay(routine, day)
   if (!steps.length) return 'sem'
