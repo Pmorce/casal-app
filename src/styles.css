@@ -229,7 +229,24 @@ h2 { font-size: 16px; font-weight: 800; margin: 18px 0 8px; }
 .legend i.parcial { background: var(--pessego-bg); border-color: var(--pessego); }
 .zone-title { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 800; color: var(--muted); margin: 10px 2px 4px; text-transform: uppercase; letter-spacing: .05em; }
 .zone-title svg { width: 16px; height: 16px; }
-.zone-tag { font-size: 11px; font-weight: 600; color: var(--muted); background: var(--wash); border-radius: 99px; padding: 1px 7px; margin-left: 4px; white-space: nowrap; }
+/* Compras: zone subtitles carry an icon and a count; the add field floats over the header with a square + inside */
+.zone-title h3 { margin: 0; font: inherit; letter-spacing: inherit; }
+.zone-count { margin-left: auto; padding: 1px 8px; border-radius: 99px; background: var(--accent-soft); color: var(--accent-ink); letter-spacing: 0; }
+.zone-picker { margin: 6px 0 4px; }
+.add-bar { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; padding: 4px 4px 4px 2px; border-radius: 18px; border: 1.5px solid transparent; background: var(--card); box-shadow: var(--shadow); transition: border-color .15s; }
+.add-bar:focus-within { border-color: var(--accent); }
+.add-bar .input, .add-bar .input:focus { min-height: 44px; border: none; background: none; }
+.add-go { flex: none; width: 44px; height: 44px; border-radius: 14px; border: none; background: var(--accent-strong); color: var(--on-accent); display: grid; place-items: center; cursor: pointer; }
+.add-go svg { width: 20px; height: 20px; stroke-width: 2.4; }
+.x-btn { flex: none; width: 44px; height: 44px; margin: -4px -8px -4px -4px; border: none; border-radius: 14px; background: none; color: var(--muted); display: grid; place-items: center; cursor: pointer; }
+.x-btn svg { width: 16px; height: 16px; }
+/* Casa: a coloured dot per state; each product row wraps its actions under the name when the screen is narrow */
+.state-title { display: flex; align-items: center; gap: 8px; margin: 2px 2px 6px; font-size: 15px; font-weight: 800; }
+.row.product { flex-wrap: wrap; row-gap: 2px; padding-top: 6px; padding-bottom: 6px; }
+.row.product > .grow { flex: 1 1 100px; }
+.product-name { font-weight: 700; overflow-wrap: anywhere; }
+.product-actions { flex: none; margin-left: auto; display: flex; align-items: center; gap: 4px; }
+.hero-help { margin: 8px 0 0; font-size: 13px; text-wrap: pretty; }
 .toast.offer { flex-wrap: wrap; background: var(--card); color: var(--text); border: 2px solid var(--accent); box-shadow: 0 6px 24px rgba(0, 0, 0, .25); }
 .toast-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; }
 .toast.offer button { color: var(--muted); }

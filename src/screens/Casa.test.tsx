@@ -36,6 +36,13 @@ test('each product shows its rhythm and has Falta and Comprei', () => {
   expect(screen.getByRole('button', { name: 'Desfazer' })).toBeTruthy()
 })
 
+test('Há row: Falta is the main action, Comprei is quieter', () => {
+  data.products = [prod({ id: 'a', name: 'Arroz', boughtKeys: ['2026-10-28'] })]
+  renderIt()
+  expect(screen.getByRole('button', { name: 'Falta Arroz' }).className).toContain('chip')
+  expect(screen.getByRole('button', { name: 'Comprei Arroz' }).className).toBe('chip quiet')
+})
+
 test('products still learning or never bought say so', () => {
   data.products = [prod({ name: 'Arroz', boughtKeys: ['2026-10-01'] }), prod({ name: 'Sal' })]
   renderIt()
@@ -52,8 +59,8 @@ test('products are grouped by what is missing first, then what may be, then what
   data.shopping = [item({ productId: 'c' })]
   renderIt()
   const titles = screen.getAllByRole('heading', { level: 3 }).map(h => h.textContent)
-  expect(titles).toEqual(['🔴 Falta (1)', '🟠 Talvez falte (1)', '🟢 Há (1)'])
-  expect(screen.getAllByText('Limpeza').some(el => el.className === 'zone-tag')).toBe(true) // zone shown small on each row
+  expect(titles).toEqual(['Falta (1)', 'Talvez falte (1)', 'Há (1)'])
+  expect(screen.getByRole('img', { name: 'Limpeza' })).toBeTruthy() // the zone icon on each row
   expect(screen.getByRole('button', { name: 'Ainda há Detergente' })).toBeTruthy()
 })
 
@@ -76,10 +83,10 @@ test('Congelador products show their bags instead of a rhythm', () => {
   expect(screen.queryByText(/a aprender/)).toBeNull()
 })
 
-test('a bought Congelador product with no bags is 🟠 Talvez falte, "não há no congelador"', () => {
+test('a bought Congelador product with no bags is Talvez falte, "não há no congelador"', () => {
   data.products = [prod({ id: 'v', name: 'Vaca', location: 'congelador', boughtKeys: ['2026-10-01'], freezerLast: { amount: 1, unit: 'kg', key: '2026-10-01' } })]
   renderIt()
-  expect(screen.getByRole('heading', { level: 3 }).textContent).toBe('🟠 Talvez falte (1)')
+  expect(screen.getByRole('heading', { level: 3 }).textContent).toBe('Talvez falte (1)')
   expect(screen.getByText('não há no congelador')).toBeTruthy()
 })
 
@@ -120,10 +127,10 @@ test('Desfazer after Comprei closes an unanswered Para o congelador', () => {
   expect(screen.queryByText(/Para o congelador/)).toBeNull()
 })
 
-test('a Congelador product bought without entering bags stays 🟢 Há, "sem sacos registados"', () => {
+test('a Congelador product bought without entering bags stays Há, "sem sacos registados"', () => {
   data.products = [prod({ id: 'v', name: 'Vaca', location: 'congelador', boughtKeys: ['2026-10-01'] })]
   renderIt()
-  expect(screen.getByRole('heading', { level: 3 }).textContent).toBe('🟢 Há (1)')
+  expect(screen.getByRole('heading', { level: 3 }).textContent).toBe('Há (1)')
   expect(screen.getByText('sem sacos registados')).toBeTruthy()
 })
 

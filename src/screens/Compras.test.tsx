@@ -41,7 +41,13 @@ test('"Terminar compras" only appears with something in the cart', () => {
 test('shows who added each item', () => {
   data.shopping = [item({ text: 'Natas', addedBy: 'B', oneOff: true })]
   renderIt()
-  expect(screen.getByText('Rui')).toBeTruthy()
+  expect(screen.getByRole('img', { name: 'Rui' })).toBeTruthy()
+})
+
+test('the header counts what is left to buy and what is in the cart', () => {
+  data.shopping = [item({ text: 'Café' }), item({ text: 'Ovos' }), item({ text: 'Leite', status: 'carrinho' })]
+  renderIt()
+  expect(screen.getByText('2 por comprar · 1 no carrinho')).toBeTruthy()
 })
 
 test('a new name asks for the zone with a guess already picked', () => {

@@ -171,7 +171,7 @@ export default {
     await a.page.getByRole('button', { name: 'Registar', exact: true }).click()
     await a.page.waitForTimeout(1500)
     await shot(a.page, 'comprei-after')
-    await expectText(a.page, '🟢 Há', 'Casa still on screen after registering')
+    await expectText(a.page, 'Há (1)', 'Casa still on screen after registering')
   },
 
   // Congelador round: Terminar compras → Para o congelador (on screen) → Quanto foi → Dividir; no page errors.
@@ -296,4 +296,5 @@ export default {
     console.log('ok: server holds product b with 1 item')
     if (errors.length) throw new Error(`page errors: ${errors.join(' | ')}`)
   },
+
 }

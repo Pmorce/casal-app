@@ -13,6 +13,9 @@ import type { FreezerBag, Product, ShoppingItem, Zone } from '../domain/types'
 import UndoToast from '../components/UndoToast'
 import SpentForm from '../components/SpentForm'
 import FreezeForm from '../components/FreezeForm'
+import PageHeader from '../components/PageHeader'
+import Avatar from '../components/Avatar'
+import Icon, { GROUP_ICON } from '../components/Icon'
 
 type ZonePick = Zone | 'oneOff'
 const PICKS: { value: ZonePick; short: string }[] = [...ZONES, { value: 'oneOff', short: 'Só desta vez' }]
@@ -20,7 +23,7 @@ const PICKS: { value: ZonePick; short: string }[] = [...ZONES, { value: 'oneOff'
 /** One tap to say where a product lives; `label` prefixes the accessible names when several pickers are on screen. */
 function ZonePicker({ selected, onPick, label }: { selected?: ZonePick; onPick: (z: ZonePick) => void; label?: string }) {
   return (
-    <div className="seg compact" style={{ marginTop: 6 }}>
+    <div className="seg compact zone-picker">
       {PICKS.map(z => (
         <button type="button" key={z.value} className={selected === z.value ? 'on' : ''}
           aria-label={label ? `${label}: ${z.short}` : undefined} onClick={() => onPick(z.value)}>{z.short}</button>
@@ -30,7 +33,7 @@ function ZonePicker({ selected, onPick, label }: { selected?: ZonePick; onPick: 
 }
 
 export default function Compras() {
-  const { uid, members } = useSession()
+  const { uid } = useSession()
   const today = useToday()
   const items = useCollection<ShoppingItem>('shopping')
   const products = useCollection<Product>('products')
@@ -90,13 +93,13 @@ export default function Compras() {
 
   const row = (i: ShoppingItem, picker = false) => (
     <div key={i.id}>
-      <div className="row">
+      <div className={i.status === 'carrinho' ? 'row done' : 'row'}>
         <button className={i.status === 'carrinho' ? 'check on' : 'check'} aria-label={i.text} onClick={() => toggleCart(i)}>
-          {i.status === 'carrinho' ? '✓' : ''}
+          {i.status === 'carrinho' && <Icon name="check" />}
         </button>
         <div className={i.status === 'carrinho' ? 'grow done-text' : 'grow'}>{i.text}</div>
-        {i.status === 'porComprar' && <span className="small muted">{members[i.addedBy] ?? ''}</span>}
-        {i.status === 'porComprar' && <button className="link-btn" aria-label={`Apagar ${i.text}`} onClick={() => remove(i)}>✕</button>}
+        {i.status === 'porComprar' && <Avatar uid={i.addedBy} size="sm" />}
+        {i.status === 'porComprar' && <button className="x-btn" aria-label={`Apagar ${i.text}`} onClick={() => remove(i)}><Icon name="x" /></button>}
       </div>
       {picker && <ZonePicker label={i.text} onPick={z => classifyItem(i, z, products)} />}
     </div>
@@ -104,73 +107,78 @@ export default function Compras() {
 
   return (
     <>
-      <h1>Lista de compras</h1>
-
-      <form className="inline" onSubmit={submit} style={{ marginBottom: 6 }}>
-        <input className="input" list="sugestoes" placeholder="+ Adicionar (ex.: Leite)" value={text}
-          onChange={e => { setText(e.target.value); setMsg(''); setGuess(null) }} />
-        <button className="btn primary" aria-label="Adicionar">+</button>
-      </form>
-      <datalist id="sugestoes">
-        {products.map(p => <option key={p.id} value={p.name} />)}
-      </datalist>
-      {msg && <p className="small error">{msg}</p>}
-      {guess && (
-        <div className="card">
-          <div className="small">Onde fica «{text.trim()}»?</div>
-          <ZonePicker selected={guess} onPick={pickZone} />
-        </div>
-      )}
-
-      <div className="card" style={{ marginTop: 10 }}>
-        <div className="card-title">Por comprar <span className="pill">{todoCount}</span></div>
-        {!todoCount && <p className="muted small">Nada por comprar 🎉</p>}
-        {groups.map(g => (
-          <div key={g.group}>
-            <h3 className="zone-title">{GROUP_LABEL[g.group]}</h3>
-            {g.items.map(i => row(i, g.group === 'semZona'))}
+      <PageHeader title="Compras" sub={`${todoCount} por comprar · ${cart.length} no carrinho`} />
+      <div className="lift">
+        <form className="add-bar" onSubmit={submit}>
+          <input className="input" list="sugestoes" placeholder="+ Adicionar (ex.: Leite)" value={text}
+            onChange={e => { setText(e.target.value); setMsg(''); setGuess(null) }} />
+          <button className="add-go" aria-label="Adicionar"><Icon name="mais1" /></button>
+        </form>
+        <datalist id="sugestoes">
+          {products.map(p => <option key={p.id} value={p.name} />)}
+        </datalist>
+        {msg && <p className="card small error">{msg}</p>}
+        {guess && (
+          <div className="card">
+            <div className="small">Onde fica «{text.trim()}»?</div>
+            <ZonePicker selected={guess} onPick={pickZone} />
           </div>
-        ))}
-      </div>
+        )}
 
-      {missing.length > 0 && (
         <div className="card">
-          <div className="card-title">Talvez falte <span className="pill">{missing.length}</span></div>
-          {missing.map(m => (
-            <div className="row" key={m.product.id}>
-              <div className="grow">
-                {m.product.name}
-                <div className="note">{m.reason === 'congelador' ? 'não há no congelador' : `costuma durar ~${shownGap(m.gap)} dias · vai em ${m.since}`}</div>
+          <div className="card-title">Por comprar <span className="pill">{todoCount}</span></div>
+          {!todoCount && <p className="muted small">Nada por comprar 🎉</p>}
+          {groups.map(g => (
+            <div key={g.group}>
+              <div className="zone-title">
+                <Icon name={GROUP_ICON[g.group]} /><h3>{GROUP_LABEL[g.group]}</h3><span className="zone-count">{g.items.length}</span>
               </div>
-              <button className="btn small primary" onClick={() => markMissing(m.product, uid, items)}>Falta</button>
-              <button className="btn small" onClick={() => snooze(m.product, today)}>Ainda há</button>
+              {g.items.map(i => row(i, g.group === 'semZona'))}
             </div>
           ))}
         </div>
-      )}
 
-      {/* where the cart was, i.e. right under the finger that tapped "Terminar compras" */}
-      {freezing && (
-        <FreezeForm products={freezing} today={today}
-          onSaved={batch => { savedBags.current = [...savedBags.current, batch] }} onDone={() => setFreezing(null)} />
-      )}
-      {askSpent && !freezing && <SpentForm title="✓ Compras terminadas. Quanto foi?" today={today} onDone={() => setAskSpent(false)} />}
-
-      {cart.length > 0 && (
-        <>
+        {missing.length > 0 && (
           <div className="card">
-            <div className="card-title">No carrinho</div>
-            {cart.map(i => row(i))}
-            <p className="small muted">Para tirar do carrinho, toca outra vez no ✓.</p>
+            <div className="card-title">Talvez falte <span className="pill">{missing.length}</span></div>
+            {missing.map(m => (
+              <div className="row product" key={m.product.id}>
+                <div className="grow">
+                  <div className="product-name">{m.product.name}</div>
+                  <div className="note">{m.reason === 'congelador' ? 'não há no congelador' : `costuma durar ~${shownGap(m.gap)} dias · vai em ${m.since}`}</div>
+                </div>
+                <div className="product-actions">
+                  <button className="chip quiet" onClick={() => snooze(m.product, today)}>Ainda há</button>
+                  <button className="chip" onClick={() => markMissing(m.product, uid, items)}>Falta</button>
+                </div>
+              </div>
+            ))}
           </div>
-          <button className="btn primary block" onClick={terminate}>✓ Terminar compras ({cart.length})</button>
-          <p className="small muted" style={{ textAlign: 'center' }}>
-            {toCasa.length
-              ? `Sai tudo da lista. Fica registado em Casa que compraram: ${toCasa.join(', ')}.`
-              : 'Sai tudo da lista. Nada disto está em Casa, por isso Casa não muda.'}
-          </p>
-        </>
-      )}
+        )}
+
+        {/* where the cart was, i.e. right under the finger that tapped "Terminar compras" */}
+        {freezing && (
+          <FreezeForm products={freezing} today={today}
+            onSaved={batch => { savedBags.current = [...savedBags.current, batch] }} onDone={() => setFreezing(null)} />
+        )}
+        {askSpent && !freezing && <SpentForm title="✓ Compras terminadas. Quanto foi?" today={today} onDone={() => setAskSpent(false)} />}
+
+        {cart.length > 0 && (
+          <>
+            <div className="card">
+              <div className="card-title">No carrinho</div>
+              {cart.map(i => row(i))}
+              <p className="small muted">Para tirar do carrinho, toca outra vez no ✓.</p>
+            </div>
+            <button className="btn primary block" onClick={terminate}><Icon name="check" />Terminar compras ({cart.length})</button>
+            <p className="small muted" style={{ textAlign: 'center' }}>
+              {toCasa.length
+                ? `Sai tudo da lista. Fica registado em Casa que compraram: ${toCasa.join(', ')}.`
+                : 'Sai tudo da lista. Nada disto está em Casa, por isso Casa não muda.'}
+            </p>
+          </>
+        )}
+      </div>
 
       {undo && <UndoToast message={undo.message} onUndo={undo.run} onClose={closeUndo} />}
     </>

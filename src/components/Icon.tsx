@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import type { ListGroup } from '../domain/zones'
 
 // One hand-drawn set on a 24×24 grid: 1.8 stroke, round caps and joins, no fill, currentColor (spec §3.4).
 const SNOWFLAKE = <path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9" />
@@ -44,7 +45,17 @@ export default function Icon({ name, size = 22 }: { name: IconName; size?: numbe
 
 export type Tone = 'pessego' | 'salva' | 'ceu' | 'rosa'
 
-/** An icon in a rounded square of its area's support colour (spec §3.1, §3.4). */
-export function Badge({ icon, tone }: { icon: IconName; tone: Tone }) {
-  return <span className={`badge ${tone}`}><Icon name={icon} /></span>
+/** An icon in a rounded square of its area's support colour (spec §3.1, §3.4); `label` when the icon alone carries meaning. */
+export function Badge({ icon, tone, label }: { icon: IconName; tone: Tone; label?: string }) {
+  return <span className={`badge ${tone}`} role={label ? 'img' : undefined} aria-label={label}><Icon name={icon} /></span>
+}
+
+/** The icon of each zone, in the shopping list and in Casa. */
+export const GROUP_ICON: Record<ListGroup, IconName> = {
+  frigorifico: 'frigorifico',
+  congelador: 'congelador',
+  despensa: 'despensa',
+  limpeza: 'limpeza',
+  oneOff: 'compras',
+  semZona: 'mais',
 }
