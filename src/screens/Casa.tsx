@@ -118,7 +118,7 @@ export default function Casa() {
               if (!list.length) return null
               return (
                 <div className="card" key={st.value}>
-                  <h3 className="state-title"><span className={`status-dot ${st.value}`} aria-hidden="true" />{st.title} ({list.length})</h3>
+                  <h2 className="state-title"><span className={`status-dot ${st.value}`} aria-hidden="true" />{st.title} ({list.length})</h2>
                   {list.map(p => (
                     <div className="row product" key={p.id}>
                       <Badge icon={GROUP_ICON[p.location]} tone={st.tone} label={ZONE_SHORT[p.location]} />

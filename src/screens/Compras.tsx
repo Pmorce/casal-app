@@ -126,7 +126,7 @@ export default function Compras() {
         )}
 
         <div className="card">
-          <div className="card-title">Por comprar <span className="pill">{todoCount}</span></div>
+          <h2 className="card-title">Por comprar <span className="pill">{todoCount}</span></h2>
           {!todoCount && <p className="muted small">Nada por comprar</p>}
           {groups.map(g => (
             <div key={g.group}>
@@ -140,7 +140,7 @@ export default function Compras() {
 
         {missing.length > 0 && (
           <div className="card">
-            <div className="card-title">Talvez falte <span className="pill">{missing.length}</span></div>
+            <h2 className="card-title">Talvez falte <span className="pill">{missing.length}</span></h2>
             {missing.map(m => (
               <div className="row product" key={m.product.id}>
                 <div className="grow">
@@ -166,7 +166,7 @@ export default function Compras() {
         {cart.length > 0 && (
           <>
             <div className="card">
-              <div className="card-title">No carrinho</div>
+              <h2 className="card-title">No carrinho</h2>
               {cart.map(i => row(i))}
               <p className="small muted">Para tirar do carrinho, toca outra vez no ✓.</p>
             </div>

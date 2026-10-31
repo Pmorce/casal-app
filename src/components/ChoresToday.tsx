@@ -13,7 +13,7 @@ const KIND_LABEL = { diaria: 'diária', semanal: 'semanal', pontual: 'pontual' }
 
 /** House chores due today (shared). Ticking hides them; a toast offers undo. The circle is who did it last. */
 export default function ChoresToday({ title = 'Tarefas da casa' }: { title?: string }) {
-  const { uid } = useSession()
+  const { uid, members } = useSession()
   const today = useToday()
   const chores = useCollection<Chore>('chores')
   const [undo, setUndo] = useState<Chore | null>(null)
@@ -35,7 +35,7 @@ export default function ChoresToday({ title = 'Tarefas da casa' }: { title?: str
           <button className="check" aria-label={c.title} onClick={async () => { setUndo(c); markChore(c, today, uid) }} />
           <div className="grow">{c.title}</div>
           <span className={overdue ? 'pill danger' : 'pill quiet'}>{overdue ? 'atrasada' : KIND_LABEL[c.kind]}</span>
-          {c.lastDoneBy && <Avatar uid={c.lastDoneBy} size="sm" />}
+          {c.lastDoneBy && <Avatar uid={c.lastDoneBy} size="sm" label={`feita por último por ${members[c.lastDoneBy] ?? '?'}`} />}
         </div>
       ))}
       {undo && <UndoToast message={`«${undo.title}» feita`} onUndo={() => undoChore(undo)} onClose={close} />}

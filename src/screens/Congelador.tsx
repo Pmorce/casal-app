@@ -118,7 +118,7 @@ export default function Congelador() {
                 {/* − {bags} +: one round selector, its buttons keep a 44px hit area */}
                 <span className="stepper">
                   <button aria-label={`Tirar um saco de ${g.name}`} onClick={() => minus(g)}><Icon name="menos" /></button>
-                  <b>{g.bags.length}</b>
+                  <b aria-live="polite">{g.bags.length}</b>
                   <button aria-label={`Mais um saco de ${g.name}`} onClick={() => addSameAsLast(g, today)}><Icon name="mais1" /></button>
                 </span>
               </div>
@@ -187,7 +187,7 @@ function SplitBag({ bag, onSplit, onCancel }: { bag: FreezerBag; onSplit: (amoun
       <div className="bag-form-row">
         <span className="stepper">
           <button type="button" aria-label="Menos sacos" onClick={() => setCount(Math.max(2, count - 1))}><Icon name="menos" /></button>
-          <b>{count}</b>
+          <b aria-live="polite">{count}</b>
           <button type="button" aria-label="Mais sacos" onClick={() => setCount(Math.min(most, count + 1))}><Icon name="mais1" /></button>
         </span>
         <span>sacos de</span>

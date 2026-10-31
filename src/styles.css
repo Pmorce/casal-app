@@ -110,7 +110,7 @@ h2 { font-size: 16px; font-weight: 800; margin: 18px 0 8px; }
 .hero-msg { margin: 12px 0 0; color: var(--text); font-size: 14px; font-weight: 700; text-wrap: pretty; }
 
 .card { background: var(--card); border-radius: var(--radius); padding: 14px; margin-bottom: 12px; box-shadow: var(--shadow); }
-.card-title { font-size: 15px; font-weight: 800; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.card-title { font-size: 15px; font-weight: 800; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 6px; }
 .row { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 4px 8px; border-radius: 14px; transition: background-color .15s, color .15s; }
 .row + .row { margin-top: 2px; }
 .row.done { background: var(--wash); color: var(--muted); }

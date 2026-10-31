@@ -61,9 +61,9 @@ export default function NovoSaco({ category: initialCategory, names, today, onDo
       <div className="field">
         <span>Nº de sacos</span>
         <div className="stepper">
-          <button type="button" aria-label="Menos um saco" onClick={() => setCount(Math.max(1, count - 1))}><Icon name="menos" /></button>
-          <b>{count}</b>
-          <button type="button" aria-label="Mais um saco" onClick={() => setCount(Math.min(20, count + 1))}><Icon name="mais1" /></button>
+          <button type="button" aria-label="Menos sacos a guardar" onClick={() => setCount(Math.max(1, count - 1))}><Icon name="menos" /></button>
+          <b aria-live="polite">{count}</b>
+          <button type="button" aria-label="Mais sacos a guardar" onClick={() => setCount(Math.min(20, count + 1))}><Icon name="mais1" /></button>
         </div>
       </div>
       {error && <p className="error">{error}</p>}

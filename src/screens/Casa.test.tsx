@@ -58,7 +58,7 @@ test('products are grouped by what is missing first, then what may be, then what
   ]
   data.shopping = [item({ productId: 'c' })]
   renderIt()
-  const titles = screen.getAllByRole('heading', { level: 3 }).map(h => h.textContent)
+  const titles = screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent)
   expect(titles).toEqual(['Falta (1)', 'Talvez falte (1)', 'Há (1)'])
   expect(screen.getByRole('img', { name: 'Limpeza' })).toBeTruthy() // the zone icon on each row
   expect(screen.getByRole('button', { name: 'Ainda há Detergente' })).toBeTruthy()
@@ -86,7 +86,7 @@ test('Congelador products show their bags instead of a rhythm', () => {
 test('a bought Congelador product with no bags is Talvez falte, "não há no congelador"', () => {
   data.products = [prod({ id: 'v', name: 'Vaca', location: 'congelador', boughtKeys: ['2026-10-01'], freezerLast: { amount: 1, unit: 'kg', key: '2026-10-01' } })]
   renderIt()
-  expect(screen.getByRole('heading', { level: 3 }).textContent).toBe('Talvez falte (1)')
+  expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Talvez falte (1)')
   expect(screen.getByText('não há no congelador')).toBeTruthy()
 })
 
@@ -130,7 +130,7 @@ test('Desfazer after Comprei closes an unanswered Para o congelador', () => {
 test('a Congelador product bought without entering bags stays Há, "sem sacos registados"', () => {
   data.products = [prod({ id: 'v', name: 'Vaca', location: 'congelador', boughtKeys: ['2026-10-01'] })]
   renderIt()
-  expect(screen.getByRole('heading', { level: 3 }).textContent).toBe('Há (1)')
+  expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Há (1)')
   expect(screen.getByText('sem sacos registados')).toBeTruthy()
 })
 

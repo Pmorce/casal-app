@@ -74,6 +74,15 @@ test('the list is grouped by zone', () => {
   expect(titles).toEqual(['Frigorífico', 'Limpeza e higiene'])
 })
 
+test('the card titles are level-2 headings and the zone titles stay level 3', () => {
+  data.products = [prod({ id: 'l', location: 'frigorifico' }), prod({ id: 'm', name: 'Manteiga', location: 'frigorifico', boughtKeys: ['2026-10-01', '2026-10-11'] })]
+  data.shopping = [item({ text: 'Leite', productId: 'l' }), item({ text: 'Pão', status: 'carrinho' })]
+  renderIt()
+  const h2 = screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent)
+  expect(h2).toEqual(['Por comprar 1', 'Talvez falte 1', 'No carrinho'])
+  expect(screen.getByRole('heading', { level: 3, name: 'Frigorífico' })).toBeTruthy()
+})
+
 test('legacy items with a reason field still render', () => {
   data.shopping = [{ ...item({ text: 'Natas' }), reason: 'acabou' } as never]
   renderIt()

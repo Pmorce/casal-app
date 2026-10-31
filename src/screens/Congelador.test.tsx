@@ -208,3 +208,20 @@ test('"Pôr na lista" uses the list as it is now, not as it was when the bag was
   fireEvent.click(screen.getByRole('button', { name: 'Pôr na lista' }))
   expect(shop.markMissing).toHaveBeenCalledWith(v, 'P', [added])
 })
+
+test('NovoSaco stepper buttons are named for the bags being stored, and the count is a live region', () => {
+  renderIt()
+  fireEvent.click(screen.getByRole('button', { name: '+ Novo saco' }))
+  expect(screen.getByRole('button', { name: 'Menos sacos a guardar' })).toBeTruthy()
+  const more = screen.getByRole('button', { name: 'Mais sacos a guardar' })
+  expect(more.previousElementSibling?.getAttribute('aria-live')).toBe('polite')
+  expect(screen.queryByRole('button', { name: 'Mais um saco' })).toBeNull()
+})
+
+test('the group stepper and the SplitBag stepper counts are live regions', () => {
+  data.bags = [bag({ name: 'Vaca', amount: 5, unit: 'kg' })]
+  renderIt()
+  openSplit('Vaca')
+  expect(screen.getByRole('button', { name: 'Mais sacos' }).previousElementSibling?.getAttribute('aria-live')).toBe('polite')
+  expect(screen.getByRole('button', { name: 'Mais um saco de Vaca' }).previousElementSibling?.getAttribute('aria-live')).toBe('polite')
+})
