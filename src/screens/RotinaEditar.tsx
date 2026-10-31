@@ -79,8 +79,8 @@ export default function RotinaEditar() {
             <div className="card" key={s.id}>
               <div className="inline" style={{ marginBottom: 8 }}>
                 <input className="input" placeholder="Passo" value={s.text} onChange={e => setStep(i, { text: e.target.value })} />
-                <button className="icon-btn" onClick={() => move(i, -1)} aria-label="Subir">↑</button>
-                <button className="icon-btn" onClick={() => move(i, 1)} aria-label="Descer">↓</button>
+                <button className="icon-btn" onClick={() => move(i, -1)} aria-label="Subir"><Icon name="acima" /></button>
+                <button className="icon-btn" onClick={() => move(i, 1)} aria-label="Descer"><Icon name="abaixo" /></button>
               </div>
               <input className="input" placeholder="Nota (opcional)" value={s.note ?? ''} onChange={e => setStep(i, { note: e.target.value || undefined })} />
               <div className="seg" style={{ marginTop: 8 }}>

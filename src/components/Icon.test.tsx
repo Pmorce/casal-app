@@ -3,7 +3,7 @@ import Icon, { Badge, type IconName } from './Icon'
 
 const NAMES: IconName[] = [
   'hoje', 'compras', 'congelador', 'casa', 'mais', 'sol', 'lua', 'vassoura', 'lista', 'euro', 'frigorifico',
-  'despensa', 'limpeza', 'peixe', 'panela', 'floco', 'check', 'x', 'mais1', 'menos', 'seta', 'voltar', 'relogio', 'sair',
+  'despensa', 'limpeza', 'peixe', 'panela', 'floco', 'check', 'x', 'mais1', 'menos', 'acima', 'abaixo', 'seta', 'voltar', 'relogio', 'sair',
 ]
 
 test.each(NAMES)('the %s icon is a decorative svg with a drawing', name => {

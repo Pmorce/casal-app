@@ -38,6 +38,12 @@ test('"Terminar compras" only appears with something in the cart', () => {
   expect(screen.getByRole('button', { name: /Terminar compras/ })).toBeTruthy()
 })
 
+test('an empty list says so in words, with no emoji', () => {
+  data.shopping = []
+  renderIt()
+  expect(screen.getByText('Nada por comprar')).toBeTruthy()
+})
+
 test('shows who added each item', () => {
   data.shopping = [item({ text: 'Natas', addedBy: 'B', oneOff: true })]
   renderIt()

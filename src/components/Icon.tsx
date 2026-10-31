@@ -26,6 +26,8 @@ const PATHS = {
   x: <path d="M7 7l10 10M17 7 7 17" />,
   mais1: <path d="M12 6v12M6 12h12" />,
   menos: <path d="M6 12h12" />,
+  acima: <path d="m6 15 6-6 6 6" />,
+  abaixo: <path d="m6 9 6 6 6-6" />,
   seta: <path d="m10 6 6 6-6 6" />,
   voltar: <path d="m14 6-6 6 6 6" />,
   relogio: <><circle cx="12" cy="12" r="8" /><path d="M12 8v4l2.5 1.5" /></>,

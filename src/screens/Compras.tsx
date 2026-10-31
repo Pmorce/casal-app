@@ -127,7 +127,7 @@ export default function Compras() {
 
         <div className="card">
           <div className="card-title">Por comprar <span className="pill">{todoCount}</span></div>
-          {!todoCount && <p className="muted small">Nada por comprar 🎉</p>}
+          {!todoCount && <p className="muted small">Nada por comprar</p>}
           {groups.map(g => (
             <div key={g.group}>
               <div className="zone-title">
