@@ -173,7 +173,7 @@ h2 { font-size: 16px; font-weight: 800; margin: 18px 0 8px; }
 
 .seg { display: flex; gap: 2px; padding: 4px; margin-bottom: 12px; border-radius: 99px; background: var(--card); box-shadow: var(--shadow); }
 .card .seg { background: var(--wash); box-shadow: none; }
-.seg button { flex: 1; min-height: 40px; border-radius: 99px; border: none; background: none; color: var(--muted); font-weight: 700; cursor: pointer; transition: background-color .15s, color .15s; }
+.seg button { flex: 1; min-height: 44px; border-radius: 99px; border: none; background: none; color: var(--muted); font-weight: 700; cursor: pointer; transition: background-color .15s, color .15s; }
 .seg button.on { background: var(--accent-soft); color: var(--accent-ink); }
 
 .login { max-width: 360px; margin: 18dvh auto 0; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
@@ -191,7 +191,7 @@ h2 { font-size: 16px; font-weight: 800; margin: 18px 0 8px; }
 .menu a { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 4px; border-radius: 14px; color: inherit; text-decoration: none; }
 .menu a + a { margin-top: 2px; }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; }
-.chips button { position: relative; min-width: 38px; min-height: 36px; padding: 0 12px; border-radius: 99px; border: 1.5px solid var(--line); background: var(--card); cursor: pointer; font-size: 13px; font-weight: 600; transition: background-color .15s, color .15s, border-color .15s; }
+.chips button { position: relative; min-width: 44px; min-height: 36px; padding: 0 12px; border-radius: 99px; border: 1.5px solid var(--line); background: var(--card); cursor: pointer; font-size: 13px; font-weight: 600; transition: background-color .15s, color .15s, border-color .15s; }
 .chips button::after { content: ''; position: absolute; inset: -4px 0; }
 .chips button.on { background: var(--accent-soft); border-color: var(--accent-soft); color: var(--accent-ink); font-weight: 700; }
 
