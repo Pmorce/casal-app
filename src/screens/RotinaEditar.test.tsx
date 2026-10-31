@@ -39,6 +39,7 @@ const backFrom = async (entries: Array<string | { pathname: string; search?: str
 
 test('editing an existing routine, ‹ goes to Rotinas (push), not back over the routine own screen', async () => {
   data.routines = [routine({ id: 'r1', ownerUid: 'P', steps: [step({ text: 'Lavar' })] })]
+  window.history.replaceState({ idx: 1 }, '')
   const router = await backFrom(['/mais/rotinas/r1', '/mais/rotinas/r1?editar=1'])
   expect(screen.getByText('rotinas')).toBeTruthy()
   expect(router.state.historyAction).toBe('PUSH')

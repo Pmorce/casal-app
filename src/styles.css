@@ -117,7 +117,7 @@ h2 { font-size: 16px; font-weight: 800; margin: 18px 0 8px; }
 .grow { flex: 1; min-width: 0; }
 .note { font-size: 13px; color: var(--muted); margin-top: 2px; }
 .note-link { position: relative; display: inline-flex; align-items: center; gap: 2px; }
-.note-link::after { content: ''; position: absolute; inset: -15px -8px; }
+.note-link::after { content: ''; position: absolute; inset: -15px -8px -15px 0; }
 .done-text { color: var(--muted); text-decoration: line-through; }
 .card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .card-head h2 { margin: 0; font-size: 15px; font-weight: 800; }
@@ -311,3 +311,4 @@ h2 { font-size: 16px; font-weight: 800; margin: 18px 0 8px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0s !important; animation-duration: 0s !important; scroll-behavior: auto !important; }
 }
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }

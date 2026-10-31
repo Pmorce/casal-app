@@ -225,3 +225,12 @@ test('the group stepper and the SplitBag stepper counts are live regions', () =>
   expect(screen.getByRole('button', { name: 'Mais sacos' }).previousElementSibling?.getAttribute('aria-live')).toBe('polite')
   expect(screen.getByRole('button', { name: 'Mais um saco de Vaca' }).previousElementSibling?.getAttribute('aria-live')).toBe('polite')
 })
+
+test('the group stepper live region announces the count with its product', () => {
+  data.bags = [bag({ name: 'Vaca', amount: 5, unit: 'kg' }), bag({ name: 'Vaca', amount: 3, unit: 'kg' })]
+  renderIt()
+  const live = screen.getByRole('button', { name: 'Mais um saco de Vaca' }).previousElementSibling!
+  expect(live.getAttribute('aria-atomic')).toBe('true')
+  expect(live.querySelector('.sr-only')?.textContent).toBe('2 sacos de Vaca')
+  expect(live.querySelector('[aria-hidden="true"]')?.textContent).toBe('2')
+})

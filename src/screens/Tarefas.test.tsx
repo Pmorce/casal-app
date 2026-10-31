@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import Tarefas from './Tarefas'
 import { chore } from '../domain/testFactories'
@@ -20,4 +20,8 @@ test('the list says who did a chore, and an unknown member is Desconhecido', () 
   expect(screen.getByText(/feita por Rui, ontem/)).toBeTruthy()
   expect(screen.getByText(/feita por Desconhecido, há 2 dias/)).toBeTruthy()
   expect(screen.queryByText(/feita por \?/)).toBeNull()
+  // the list row's avatar is decorative (the name is in its text); the Hoje card above has its own labelled one
+  const row = screen.getByText(/feita por Rui, ontem/).closest('.row')!
+  expect(row.querySelector('.avatar')).toBeTruthy()
+  expect(within(row as HTMLElement).queryByRole('img')).toBeNull()
 })
