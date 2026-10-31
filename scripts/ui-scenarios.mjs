@@ -10,7 +10,7 @@ export default {
     await shot(page, 'shell')
   },
 
-  // Task 9: pantry → list on the other phone; finish shopping restores "Há" on both.
+  // Task 9: pantry → list on the other phone; finish shopping moves it back to "Há" on both.
   async compras({ login, shot, expectText }) {
     await (await import('./ui-admin.mjs')).resetDb()
     const a = await login('ana')
@@ -20,10 +20,14 @@ export default {
     await a.page.getByRole('button', { name: 'Despensa' }).click()
     await a.page.getByRole('button', { name: 'Adicionar' }).click()
     await expectText(a.page, 'Café', 'product created')
-    await a.page.locator('.row', { hasText: 'Café' }).getByRole('button', { name: 'Acabou' }).click()
+    await a.page.getByRole('button', { name: 'Falta Café' }).click()
+    const card = title => a.page.locator('.card', { has: a.page.getByRole('heading', { name: title }) })
+    await card(/Falta/).getByText('Café').waitFor({ timeout: 8000 })
+    console.log('ok: Café under "Falta" on Ana’s phone')
 
     await b.page.goto(b.page.url().split('#')[0] + '#/compras')
-    await expectText(b.page, 'acabou', 'Rui sees Café flagged "acabou"')
+    await b.page.getByRole('button', { name: 'Café', exact: true }).waitFor({ timeout: 8000 })
+    console.log('ok: Rui sees Café on the list')
     await b.page.getByPlaceholder('+ Adicionar (ex.: Leite)').fill('cafe ')
     await b.page.getByRole('button', { name: 'Adicionar' }).click()
     await expectText(b.page, 'Já está na lista', 'duplicate blocked')
@@ -32,9 +36,8 @@ export default {
     await b.page.getByRole('button', { name: /Terminar compras/ }).click()
     await expectText(b.page, 'Nada por comprar', 'list empty after finishing')
 
-    const haBtn = a.page.locator('.row', { hasText: 'Café' }).getByRole('button', { name: 'Há' })
-    await haBtn.and(a.page.locator('.on')).waitFor({ timeout: 8000 })
-    console.log('ok: Café back to "Há" on Ana\'s phone')
+    await card(/Há/).getByText('Café').waitFor({ timeout: 8000 })
+    console.log('ok: Café back under "Há" on Ana’s phone')
     await shot(a.page, 'casa-after')
   },
 
