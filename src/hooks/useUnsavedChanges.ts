@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react'
-import { useBlocker, useLocation, useNavigate } from 'react-router-dom'
+import { useBlocker, useNavigate } from 'react-router-dom'
+import { hasEntryBehind } from './inAppHistory'
 
 /**
  * Editors flag unsaved changes; leaving then asks first — through the tab bar, the Android Back button,
@@ -9,7 +10,6 @@ import { useBlocker, useLocation, useNavigate } from 'react-router-dom'
  */
 export function useUnsavedChanges(isDirty: boolean): (fallback: string) => void {
   const navigate = useNavigate()
-  const { key } = useLocation()
   const leaving = useRef(false)
   const blocker = useBlocker(({ historyAction }) => isDirty && !leaving.current && historyAction !== 'REPLACE')
 
@@ -28,7 +28,7 @@ export function useUnsavedChanges(isDirty: boolean): (fallback: string) => void 
 
   return useCallback((fallback: string) => {
     leaving.current = true
-    if (key !== 'default') navigate(-1)
+    if (hasEntryBehind()) navigate(-1)
     else navigate(fallback, { replace: true })
-  }, [navigate, key])
+  }, [navigate])
 }

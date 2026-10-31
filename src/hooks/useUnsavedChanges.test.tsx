@@ -25,7 +25,10 @@ const renderAt = (dirty: boolean, entries = ['/mais/rotinas/r1']) => {
   return router
 }
 
-afterEach(() => vi.restoreAllMocks())
+// the memory router has no window.history.state.idx, which is what tells there is an in-app entry behind
+const setIdx = (idx?: number) => window.history.replaceState(idx === undefined ? null : { idx }, '')
+
+afterEach(() => { vi.restoreAllMocks(); setIdx() })
 
 test('Back with unsaved changes asks first, and staying keeps the edits', async () => {
   const ask = vi.spyOn(window, 'confirm').mockReturnValue(false)
@@ -69,6 +72,7 @@ test('save and cancel navigations (replace) are not blocked', async () => {
 
 test('leave goes back to where you came from, without asking, even with unsaved changes', async () => {
   const ask = vi.spyOn(window, 'confirm')
+  setIdx(1)
   const router = renderAt(true, ['/compras', '/mais/rotinas/r1'])
   fireEvent.click(screen.getByText('sair'))
   await act(() => Promise.resolve())
@@ -85,7 +89,17 @@ test('leave with nothing behind replaces with the fallback', async () => {
   expect(router.state.historyAction).toBe('REPLACE')
 })
 
+test('leave after a reload (editor is entry 0, key not default) replaces with the fallback instead of leaving the app', async () => {
+  setIdx(0)
+  const router = renderAt(true, [{ pathname: '/mais/rotinas/r1', key: 'abc123' }] as unknown as string[])
+  fireEvent.click(screen.getByText('sair'))
+  await act(() => Promise.resolve())
+  expect(screen.getByText('compras')).toBeTruthy()
+  expect(router.state.historyAction).toBe('REPLACE')
+})
+
 test('after leave, Back from the list does not land on the list again', async () => {
+  setIdx(2)
   const router = renderAt(true, ['/', '/mais/rotinas', '/mais/rotinas/r1'])
   fireEvent.click(screen.getByText('sair'))
   await act(() => Promise.resolve())

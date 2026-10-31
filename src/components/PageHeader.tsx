@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Icon from './Icon'
+import { hasEntryBehind } from '../hooks/inAppHistory'
 
 type Back = {
   to: string
@@ -37,13 +38,9 @@ export default function PageHeader({ title, sub, back, right }: Props) {
 // its own component: the router hooks only run when there is a back link (ErrorBoundary's header has none)
 function BackLink({ to, label, history }: Back) {
   const navigate = useNavigate()
-  // `idx` is the position React Router's browser/hash histories keep in window.history.state: > 0 means an in-app
-  // entry behind. After a reload the editor can be entry 0 (its location key survives the reload, so it is no signal).
-  const idx = (window.history.state as { idx?: number } | null)?.idx
-  const pop = history && typeof idx === 'number' && idx > 0
   return (
     <Link to={to} className="hero-back" aria-label={label}
-      onClick={pop ? e => { e.preventDefault(); navigate(-1) } : undefined}>
+      onClick={history ? e => { if (hasEntryBehind()) { e.preventDefault(); navigate(-1) } } : undefined}>
       <Icon name="voltar" />
     </Link>
   )
