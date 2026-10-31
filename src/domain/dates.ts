@@ -46,3 +46,6 @@ export function msUntilNextMidnight(now: Date): number {
   const elapsed = ((h * 60 + m) * 60 + s) * 1000 + now.getMilliseconds()
   return DAY_MS - elapsed
 }
+
+/** The hour (0–23) on the wall clock in Lisbon. */
+export const lisbonHour = (now: Date): number => Number(timeFormat.format(now).split(':')[0])
