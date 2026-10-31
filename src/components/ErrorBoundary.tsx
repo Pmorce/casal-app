@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from 'react'
+import PageHeader from './PageHeader'
 
 interface Props {
   /** changing it (e.g. switching tab) clears the error */
@@ -22,12 +23,14 @@ export default class ErrorBoundary extends Component<Props, { error: Error | nul
     const { error } = this.state
     if (!error) return this.props.children
     return (
-      <div className="card">
-        <h1>Algo correu mal</h1>
-        <p className="small muted">Recarrega a app. Se voltar a acontecer, copia a mensagem abaixo.</p>
-        <pre className="small" style={{ whiteSpace: 'pre-wrap', userSelect: 'text' }}>{error.message}</pre>
-        <button className="btn primary block" onClick={() => window.location.reload()}>Recarregar</button>
-      </div>
+      <>
+        <PageHeader title="Algo correu mal" />
+        <div className="lift card">
+          <p className="small muted" style={{ marginTop: 0 }}>Recarrega a app. Se voltar a acontecer, copia a mensagem abaixo.</p>
+          <pre className="error-msg">{error.message}</pre>
+          <button className="btn primary block" onClick={() => window.location.reload()}>Recarregar</button>
+        </div>
+      </>
     )
   }
 }

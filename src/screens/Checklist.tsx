@@ -1,10 +1,14 @@
 import { useState } from 'react'
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useCollection } from '../data/useCollection'
 import { useSession } from '../data/session'
 import { clearChecklist, deleteChecklist, newId, saveChecklist, toggleChecklistItem } from '../data/routinesRepo'
 import type { Checklist as ChecklistT, Routine } from '../domain/types'
 import { useUnsavedChanges } from '../hooks/useUnsavedChanges'
+import PageHeader from '../components/PageHeader'
+import Icon from '../components/Icon'
+
+const BACK = { to: '/mais/rotinas', label: 'Voltar a Rotinas' }
 
 /** Reusable checklist (e.g. packing a bag): tick while packing, "Limpar" to start over. Owner-only edits. */
 export default function Checklist() {
@@ -39,31 +43,33 @@ export default function Checklist() {
     }
     return (
       <>
-        <h1>Editar checklist</h1>
-        <label className="field"><span>Nome</span>
-          <input className="input" value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} /></label>
-        <div className="card">
-          {draft.items.map(i => (
-            <div className="row" key={i.id}>
-              <input className="input grow" value={i.text}
-                onChange={e => setDraft({ ...draft, items: draft.items.map(x => (x.id === i.id ? { ...x, text: e.target.value } : x)) })} />
-              <button className="link-btn" onClick={() => setDraft({ ...draft, items: draft.items.filter(x => x.id !== i.id) })}>✕</button>
-            </div>
-          ))}
-          <form className="inline" style={{ marginTop: 8 }} onSubmit={e => { e.preventDefault(); add() }}>
-            <input className="input" placeholder="Novo item" value={newItem} onChange={e => setNewItem(e.target.value)} />
-            <button className="btn">+</button>
-          </form>
-        </div>
-        <button className="btn primary block" onClick={done}>Guardar</button>
-        <div className="inline" style={{ justifyContent: 'space-between', marginTop: 8 }}>
-          <button className="link-btn" onClick={() => {
-            setDraft(null)
-            if (isNew) leave('/mais/rotinas')
-            else navigate(`/mais/checklists/${id}`, { replace: true })
-          }}>Cancelar</button>
-          {!isNew && <button className="link-btn" style={{ color: 'var(--danger)' }}
-            onClick={async () => { if (confirm('Apagar esta checklist?')) { deleteChecklist(id, myRoutines); leave('/mais/rotinas') } }}>Apagar checklist</button>}
+        <PageHeader title="Editar checklist" back={BACK} />
+        <div className="lift">
+          <div className="card">
+            <label className="field"><span>Nome</span>
+              <input className="input" value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} /></label>
+            {draft.items.map(i => (
+              <div className="row" key={i.id} style={{ paddingLeft: 0 }}>
+                <input className="input grow" aria-label={`Item ${i.text}`} value={i.text}
+                  onChange={e => setDraft({ ...draft, items: draft.items.map(x => (x.id === i.id ? { ...x, text: e.target.value } : x)) })} />
+                <button className="x-btn" aria-label={`Tirar ${i.text}`} onClick={() => setDraft({ ...draft, items: draft.items.filter(x => x.id !== i.id) })}><Icon name="x" /></button>
+              </div>
+            ))}
+            <form className="inline" style={{ marginTop: 8 }} onSubmit={e => { e.preventDefault(); add() }}>
+              <input className="input" placeholder="Novo item" value={newItem} onChange={e => setNewItem(e.target.value)} />
+              <button className="icon-btn" aria-label="Juntar item"><Icon name="mais1" /></button>
+            </form>
+          </div>
+          <button className="btn primary block" onClick={done}>Guardar</button>
+          <div className="inline" style={{ justifyContent: 'space-between', marginTop: 8 }}>
+            <button className="link-btn" onClick={() => {
+              setDraft(null)
+              if (isNew) leave('/mais/rotinas')
+              else navigate(`/mais/checklists/${id}`, { replace: true })
+            }}>Cancelar</button>
+            {!isNew && <button className="link-btn" style={{ color: 'var(--danger)' }}
+              onClick={async () => { if (confirm('Apagar esta checklist?')) { deleteChecklist(id, myRoutines); leave('/mais/rotinas') } }}>Apagar checklist</button>}
+          </div>
         </div>
       </>
     )
@@ -71,26 +77,25 @@ export default function Checklist() {
 
   return (
     <>
-      <Link to="/mais/rotinas" className="link-btn">‹ Rotinas</Link>
-      <div className="card-title">
-        <h1>{list.name}</h1>
-        {mine && <button className="btn small" onClick={() => setDraft(structuredClone(list))}>Editar</button>}
+      <PageHeader title={list.name} back={BACK}
+        sub={!mine && `Checklist de ${members[list.ownerUid]} · só leitura`}
+        right={mine && <button className="btn small" onClick={() => setDraft(structuredClone(list))}>Editar</button>} />
+      <div className="lift">
+        <div className="card">
+          <div className="card-title"><span /> <span className="pill">{list.checkedIds.length}/{list.items.length}</span></div>
+          {list.items.map(i => {
+            const on = list.checkedIds.includes(i.id)
+            return (
+              <div className={on ? 'row done' : 'row'} key={i.id}>
+                <button className={on ? 'check on' : 'check'} disabled={!mine} aria-label={i.text}
+                  onClick={() => toggleChecklistItem(list, i.id, !on)}>{on && <Icon name="check" />}</button>
+                <div className={on ? 'grow done-text' : 'grow'}>{i.text}</div>
+              </div>
+            )
+          })}
+        </div>
+        {mine && list.checkedIds.length > 0 && <button className="btn block" onClick={() => clearChecklist(list)}>Limpar</button>}
       </div>
-      {!mine && <p className="small muted" style={{ marginTop: -8 }}>Checklist de {members[list.ownerUid]} · só leitura</p>}
-      <div className="card">
-        <div className="card-title"><span /> <span className="pill">{list.checkedIds.length}/{list.items.length}</span></div>
-        {list.items.map(i => {
-          const on = list.checkedIds.includes(i.id)
-          return (
-            <div className="row" key={i.id}>
-              <button className={on ? 'check on' : 'check'} disabled={!mine} aria-label={i.text}
-                onClick={() => toggleChecklistItem(list, i.id, !on)}>{on ? '✓' : ''}</button>
-              <div className={on ? 'grow done-text' : 'grow'}>{i.text}</div>
-            </div>
-          )
-        })}
-      </div>
-      {mine && list.checkedIds.length > 0 && <button className="btn block" onClick={() => clearChecklist(list)}>Limpar</button>}
     </>
   )
 }

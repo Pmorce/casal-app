@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { monthHistory } from '../domain/routines'
 import { weekdayOf, type DateKey } from '../domain/dates'
 import type { Routine, RoutineCheck } from '../domain/types'
+import Icon from './Icon'
 
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 const HEAD = ['S', 'T', 'Q', 'Q', 'S', 'S', 'D']
@@ -19,13 +20,13 @@ export default function MonthCalendar({ routine, checks, today }: { routine: Rou
 
   return (
     <div className="card">
-      <div className="card-title">
-        <button className="link-btn" onClick={() => shift(-1)} aria-label="Mês anterior">‹</button>
+      <div className="month-nav">
+        <button onClick={() => shift(-1)} aria-label="Mês anterior"><Icon name="voltar" /></button>
         <span>{MONTHS[ym.m - 1]} {ym.y}</span>
-        <button className="link-btn" onClick={() => shift(1)} aria-label="Mês seguinte">›</button>
+        <button onClick={() => shift(1)} aria-label="Mês seguinte"><Icon name="seta" /></button>
       </div>
       <div className="cal">
-        {HEAD.map((h, i) => <div key={i} className="muted">{h}</div>)}
+        {HEAD.map((h, i) => <div key={i} className="cal-head">{h}</div>)}
         {Array.from({ length: lead }, (_, i) => <div key={`e${i}`} />)}
         {days.map(d => {
           const future = d.key > today || (routine.createdKey !== undefined && d.key < routine.createdKey)

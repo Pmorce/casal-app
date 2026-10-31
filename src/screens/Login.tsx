@@ -21,13 +21,16 @@ export default function Login() {
     }
   }
 
+  // the first screen anyone sees: the header colour full-screen, the app's name in Fraunces (spec §5)
   return (
-    <form className="login" onSubmit={submit}>
-      <h1>🏠 Casa</h1>
-      <input className="input" type="email" autoComplete="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} />
-      <input className="input" type="password" autoComplete="current-password" placeholder="Palavra-passe" value={password} onChange={e => setPassword(e.target.value)} />
-      {error && <p className="error">{error}</p>}
-      <button className="btn primary" disabled={busy}>Entrar</button>
-    </form>
+    <div className="splash">
+      <h1 className="splash-name">Casal App</h1>
+      <form className="login card" onSubmit={submit}>
+        <input className="input" type="email" autoComplete="email" placeholder="Email" aria-label="Email" value={email} onChange={e => setEmail(e.target.value)} />
+        <input className="input" type="password" autoComplete="current-password" placeholder="Palavra-passe" aria-label="Palavra-passe" value={password} onChange={e => setPassword(e.target.value)} />
+        {error && <p className="error">{error}</p>}
+        <button className="btn primary" disabled={busy}>Entrar</button>
+      </form>
+    </div>
   )
 }

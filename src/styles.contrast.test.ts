@@ -46,6 +46,10 @@ describe.each([['light', light], ['dark', dark]] as const)('%s theme', (_, t) =>
     for (const stop of stops) expect(contrast(t['--hero-muted'], stop), stop).toBeGreaterThanOrEqual(4.5)
   })
 
+  test('titles and the Login name read on every colour of the header (--text)', () => {
+    for (const stop of t['--hero'].match(/#[0-9a-f]{6}/gi) ?? []) expect(contrast(t['--text'], stop), stop).toBeGreaterThanOrEqual(4.5)
+  })
+
   test('the Hoje tiles read on their tones (pêssego text is --warn)', () => {
     expect(contrast(t['--warn'], t['--pessego-bg'])).toBeGreaterThanOrEqual(4.5)
     expect(contrast(t['--ceu'], t['--ceu-bg'])).toBeGreaterThanOrEqual(4.5)

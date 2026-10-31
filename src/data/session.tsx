@@ -46,21 +46,28 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     )
   }, [user])
 
-  if (user === undefined) return <div className="center muted">A carregar…</div>
+  if (user === undefined) return <Loading />
   if (!user) return <Login />
   if (denied) {
     return (
-      <div className="center">
-        <p>Esta conta não tem acesso.</p>
-        <button className="btn" onClick={() => signOut(auth)}>Terminar sessão</button>
+      <div className="splash">
+        <div className="login card">
+          <p>Esta conta não tem acesso.</p>
+          <button className="btn" onClick={() => signOut(auth)}>Terminar sessão</button>
+        </div>
       </div>
     )
   }
-  if (!members) return <div className="center muted">A carregar…</div>
+  if (!members) return <Loading />
 
   return (
     <SessionContext.Provider value={{ uid: user.uid, name: members[user.uid], members }}>
       {children}
     </SessionContext.Provider>
   )
+}
+
+/** While the session starts: the login's look, so the first screen does not flash. */
+function Loading() {
+  return <div className="splash"><p className="splash-name">Casal App</p><p className="splash-sub">A carregar…</p></div>
 }
