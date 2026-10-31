@@ -18,6 +18,8 @@ const DAY_CHIPS: { d: Weekday; l: string }[] = [
 const DAY_NAMES = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']
 const ALL_DAYS: Weekday[] = [0, 1, 2, 3, 4, 5, 6]
 const BACK = { to: '/mais/rotinas', label: 'Voltar a Rotinas' }
+// in edit mode ‹ goes back in history, so a discarded new item's editor is not replayed by Back
+const BACK_EDITING = { ...BACK, history: true }
 
 const daysLabel = (days: Weekday[]) =>
   days.length === 7 ? 'todos os dias' : [...days].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map(d => DAY_NAMES[d]).join(', ')
@@ -64,7 +66,7 @@ export default function RotinaEditar() {
 
     return (
       <>
-        <PageHeader title="Editar rotina" back={BACK} />
+        <PageHeader title="Editar rotina" back={BACK_EDITING} />
         <div className="lift">
           <div className="card">
             <label className="field"><span>Nome</span>

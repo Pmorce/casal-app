@@ -9,6 +9,8 @@ import PageHeader from '../components/PageHeader'
 import Icon from '../components/Icon'
 
 const BACK = { to: '/mais/rotinas', label: 'Voltar a Rotinas' }
+// in edit mode ‹ goes back in history, so a discarded new item's editor is not replayed by Back
+const BACK_EDITING = { ...BACK, history: true }
 
 /** Reusable checklist (e.g. packing a bag): tick while packing, "Limpar" to start over. Owner-only edits. */
 export default function Checklist() {
@@ -43,7 +45,7 @@ export default function Checklist() {
     }
     return (
       <>
-        <PageHeader title="Editar checklist" back={BACK} />
+        <PageHeader title="Editar checklist" back={BACK_EDITING} />
         <div className="lift">
           <div className="card">
             <label className="field"><span>Nome</span>

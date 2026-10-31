@@ -1,12 +1,22 @@
 import type { ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import Icon from './Icon'
+
+type Back = {
+  to: string
+  label: string
+  /**
+   * Editors: go back in history (a POP, which useUnsavedChanges still guards) instead of pushing `to`,
+   * so a discarded new item's editor is not left behind for Android Back to reopen. Nothing behind: push `to`.
+   */
+  history?: boolean
+}
 
 type Props = {
   title: string
   sub?: ReactNode
   /** Secondary screens: a ‹ back link (still a Link, so useUnsavedChanges keeps guarding it) and a lower header. */
-  back?: { to: string; label: string }
+  back?: Back
   right?: ReactNode
 }
 
@@ -14,12 +24,25 @@ type Props = {
 export default function PageHeader({ title, sub, back, right }: Props) {
   return (
     <header className={back ? 'hero compact' : 'hero'}>
-      {back && <Link to={back.to} className="hero-back" aria-label={back.label}><Icon name="voltar" /></Link>}
+      {back && <BackLink {...back} />}
       <div className="hero-text">
         <h1>{title}</h1>
         {sub && <div className="hero-sub">{sub}</div>}
       </div>
       {right && <div className="hero-right">{right}</div>}
     </header>
+  )
+}
+
+// its own component: the router hooks only run when there is a back link (ErrorBoundary's header has none)
+function BackLink({ to, label, history }: Back) {
+  const navigate = useNavigate()
+  const { key } = useLocation()
+  const pop = history && key !== 'default'
+  return (
+    <Link to={to} className="hero-back" aria-label={label}
+      onClick={pop ? e => { e.preventDefault(); navigate(-1) } : undefined}>
+      <Icon name="voltar" />
+    </Link>
   )
 }

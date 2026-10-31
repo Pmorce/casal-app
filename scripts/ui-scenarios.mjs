@@ -258,6 +258,35 @@ export default {
     await page.goBack()
     await expectText(page, 'Rotinas e checklists', 'Back after Apagar lands on Mais, not on Rotinas again')
     await shot(page, 'voltar-apagou')
+
+    // the header ‹ in a new item's editor asks, and leaves no editor behind for Back to reopen
+    await page.getByRole('link', { name: /Rotinas e checklists/ }).click()
+    await page.getByRole('button', { name: '+ Nova rotina' }).click()
+    await page.getByRole('button', { name: '+ Passo' }).click()
+    await page.getByPlaceholder('Passo').fill('Beber água')
+    const askedBack = []
+    page.once('dialog', d => { askedBack.push(d.message()); d.accept() })
+    await page.getByRole('link', { name: 'Voltar a Rotinas' }).click()
+    await expectText(page, '+ Nova rotina', 'the header ‹ leaves the new editor')
+    if (askedBack[0] !== 'Tens alterações por guardar. Sair mesmo assim?') throw new Error(`‹ did not ask: ${JSON.stringify(askedBack)}`)
+    page.on('dialog', d => { askedBack.push(d.message()); d.dismiss() })
+    await page.goBack()
+    await expectText(page, 'Rotinas e checklists', 'Back after ‹ lands on Mais, not on the discarded editor')
+    if (askedBack.length !== 1 || await page.getByPlaceholder('Passo').count()) throw new Error('the discarded editor came back')
+
+    // an existing item: ‹ from its editor still asks and returns to the list
+    await page.getByRole('link', { name: /Rotinas e checklists/ }).click()
+    await page.getByRole('button', { name: '+ Nova rotina' }).click()
+    await page.getByLabel('Nome').fill('Rotina guardada')
+    await page.getByRole('button', { name: 'Guardar' }).click()
+    await page.getByRole('button', { name: 'Editar' }).click()
+    await page.getByLabel('Nome').fill('Rotina mudada')
+    page.removeAllListeners('dialog')
+    page.once('dialog', d => { askedBack.push(d.message()); d.accept() })
+    await page.getByRole('link', { name: 'Voltar a Rotinas' }).click()
+    await expectText(page, 'Rotina guardada', 'existing item: ‹ asks and returns to Rotinas')
+    if (askedBack.length !== 2) throw new Error('existing item: ‹ did not ask')
+    await shot(page, 'voltar-seta')
     if (errors.length) throw new Error(`page errors: ${errors.join(' | ')}`)
   },
 
