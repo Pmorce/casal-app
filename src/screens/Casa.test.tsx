@@ -39,8 +39,23 @@ test('each product shows its rhythm and has Falta and Comprei', () => {
 test('Há row: Falta is the main action, Comprei is quieter', () => {
   data.products = [prod({ id: 'a', name: 'Arroz', boughtKeys: ['2026-10-28'] })]
   renderIt()
-  expect(screen.getByRole('button', { name: 'Falta Arroz' }).className).toContain('chip')
+  expect(screen.getByRole('button', { name: 'Falta Arroz' }).className).toBe('chip line')
   expect(screen.getByRole('button', { name: 'Comprei Arroz' }).className).toBe('chip quiet')
+})
+
+test('Falta row: Comprei is the only, main action', () => {
+  data.products = [prod({ id: 'c', name: 'Café' })]
+  data.shopping = [item({ productId: 'c' })]
+  renderIt()
+  expect(screen.getByRole('button', { name: 'Comprei Café' }).className).toBe('chip')
+  expect(screen.queryByRole('button', { name: 'Falta Café' })).toBeNull()
+})
+
+test('Talvez falte row: Falta is the main action, Ainda há is quieter', () => {
+  data.products = [prod({ id: 'd', name: 'Detergente', location: 'limpeza', boughtKeys: ['2026-09-01', '2026-09-11', '2026-09-21'] })]
+  renderIt()
+  expect(screen.getByRole('button', { name: 'Falta Detergente' }).className).toBe('chip')
+  expect(screen.getByRole('button', { name: 'Ainda há Detergente' }).className).toBe('chip quiet')
 })
 
 test('products still learning or never bought say so', () => {

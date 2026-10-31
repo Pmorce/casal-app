@@ -17,6 +17,15 @@ test('moment line: rule order and copy', () => {
   expect(momentLine({ ...base, maybeMissing: 3 })).toBe('3 coisas podem estar a acabar')
   expect(momentLine(base)).toBe('Dia tranquilo por aqui')
 })
+test('moment line: the morning closed, and one evening step left', () => {
+  expect(momentLine({ ...base, routine: { done: 3, total: 3 } })).toBe('Manhã fechada. Bom trabalho ✨')
+  expect(momentLine({ ...base, period: 'noite', routine: { done: 2, total: 3 } })).toBe('Falta só um passo para fechares a noite ✨')
+})
+test('moment line: an empty routine falls through, a 0 of 1 routine is rule 1', () => {
+  expect(momentLine({ ...base, routine: { done: 0, total: 0 }, choresDue: 2 })).toBe('Hoje há 2 tarefas da casa')
+  expect(momentLine({ ...base, routine: { done: 0, total: 0 } })).toBe('Dia tranquilo por aqui')
+  expect(momentLine({ ...base, routine: { done: 0, total: 1 }, choresDue: 2 })).toBe('Falta só um passo para fechares a manhã ✨')
+})
 test('memberColor: alphabetical uid order, neutral for unknown', () => {
   const members = { zz9: 'Rui', aa1: 'Ana' }
   expect(memberColor('aa1', members)).toEqual({ bg: '#B9D6E8', ink: '#2E5873', initial: 'A' })
