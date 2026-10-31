@@ -21,7 +21,7 @@ function Menu() {
   const today = useToday()
   const routines = useCollection<Routine>('routines', ['ownerUid', '==', uid])
   const checklists = useCollection<ChecklistT>('checklists', ['ownerUid', '==', uid])
-  const expenses = useCollection<Expense>('expenses')
+  const expenses = useCollection<Expense>('expenses', ['dateKey', '>=', `${today.slice(0, 7)}-01`])
   const { total } = monthTotals(expenses, Number(today.slice(0, 4)), Number(today.slice(5, 7)))
   // the same order as the colours (memberColor); no articles: they depend on the names
   const names = Object.keys(members).sort().map(id => members[id])

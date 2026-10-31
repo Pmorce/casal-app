@@ -5,11 +5,16 @@ import { routine } from '../domain/testFactories'
 import type { Checklist, Expense, Routine } from '../domain/types'
 
 const data = vi.hoisted(() => ({ expenses: [] as Expense[], routines: [] as Routine[], checklists: [] as Checklist[] }))
+const calls = vi.hoisted(() => ({ list: [] as unknown[][] }))
+const today = vi.hoisted(() => ({ value: '2026-10-31' }))
 vi.mock('../data/useCollection', () => ({
-  useCollection: (path: string) => (data as Record<string, unknown[]>)[path] ?? [],
+  useCollection: (path: string, ...rest: unknown[]) => {
+    calls.list.push([path, ...rest])
+    return (data as Record<string, unknown[]>)[path] ?? []
+  },
 }))
 vi.mock('../data/session', () => ({ useSession: () => ({ uid: 'P', name: 'Ana', members: { P: 'Ana', B: 'Rui' } }) }))
-vi.mock('../hooks/useToday', () => ({ useToday: () => '2026-10-31' }))
+vi.mock('../hooks/useToday', () => ({ useToday: () => today.value }))
 vi.mock('../data/firebase', () => ({ auth: {} }))
 vi.mock('firebase/auth', () => ({ signOut: vi.fn() }))
 vi.mock('./Rotinas', () => ({ default: () => null }))
@@ -25,6 +30,8 @@ beforeEach(() => {
   data.expenses = []
   data.routines = []
   data.checklists = []
+  calls.list = []
+  today.value = '2026-10-31'
 })
 
 const renderMais = () => render(<MemoryRouter><Mais /></MemoryRouter>)
@@ -39,6 +46,17 @@ test('with no expenses this month, the Gastos line says so', () => {
   data.expenses = [spent('c', 9900, '2026-09-30')]
   renderMais()
   expect(screen.getByText('ainda sem gastos este mês')).toBeTruthy()
+})
+
+test('Mais asks only for the current month expenses', () => {
+  renderMais()
+  expect(calls.list).toContainEqual(['expenses', ['dateKey', '>=', '2026-10-01']])
+})
+
+test('on the first of the month the filter moves to that month', () => {
+  today.value = '2026-11-01'
+  renderMais()
+  expect(calls.list).toContainEqual(['expenses', ['dateKey', '>=', '2026-11-01']])
 })
 
 test('the Rotinas line counts routines and checklists', () => {
