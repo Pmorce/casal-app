@@ -19,8 +19,8 @@ test('moment line: rule order and copy', () => {
 })
 test('memberColor: alphabetical uid order, neutral for unknown', () => {
   const members = { zz9: 'Rui', aa1: 'Ana' }
-  expect(memberColor('aa1', members)).toEqual({ bg: '#F2B8C6', ink: '#7A3550', initial: 'A' })
-  expect(memberColor('zz9', members)).toEqual({ bg: '#B9D6E8', ink: '#2E5873', initial: 'R' })
+  expect(memberColor('aa1', members)).toEqual({ bg: '#B9D6E8', ink: '#2E5873', initial: 'A' })
+  expect(memberColor('zz9', members)).toEqual({ bg: '#F2B8C6', ink: '#7A3550', initial: 'R' })
   expect(memberColor('gone', members).initial).toBe('?')
 })
 test('rotinas help line', () => {

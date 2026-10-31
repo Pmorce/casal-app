@@ -34,8 +34,8 @@ export type MemberColor = { bg: string; ink: string; initial: string }
 
 /** First colour goes to the first uid alphabetically, second to the second. Swap the order here if needed. */
 export const MEMBER_COLORS: readonly { bg: string; ink: string }[] = [
-  { bg: '#F2B8C6', ink: '#7A3550' },
   { bg: '#B9D6E8', ink: '#2E5873' },
+  { bg: '#F2B8C6', ink: '#7A3550' },
 ]
 
 export function memberColor(uid: string, members: Record<string, string>): MemberColor {
