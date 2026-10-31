@@ -166,12 +166,12 @@ h2 { font-size: 16px; font-weight: 800; margin: 18px 0 8px; }
 .btn.ghost { border-color: transparent; background: none; color: var(--accent-ink); padding: 0 10px; }
 .btn.block { width: 100%; }
 .btn.small { min-height: 36px; padding: 0 14px; font-size: 14px; }
-.btn.small::after { content: ''; position: absolute; inset: -4px 0; }
+.btn.small::after { content: ''; position: absolute; inset: -5.5px 0; }
 .btn:disabled { opacity: .55; cursor: default; box-shadow: none; }
 .btn svg { width: 18px; height: 18px; stroke-width: 2.2; }
 
 .chip { position: relative; min-height: 34px; padding: 0 13px; border-radius: 99px; border: 1.5px solid transparent; background: var(--accent-soft); color: var(--accent-ink); font-size: 13px; font-weight: 700; white-space: nowrap; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: background-color .15s, color .15s, border-color .15s; }
-.chip::after { content: ''; position: absolute; inset: -5px -2px; }
+.chip::after { content: ''; position: absolute; inset: -6.5px -2px; }
 .chip.line { background: none; border-color: var(--line); color: var(--text); }
 .chip.quiet { background: none; color: var(--muted); padding: 0 8px; }
 .chip svg { width: 15px; height: 15px; stroke-width: 2.2; }
@@ -231,7 +231,7 @@ h2 { font-size: 16px; font-weight: 800; margin: 18px 0 8px; }
 .quiet-line { width: 100%; min-height: 44px; margin-bottom: 12px; border: none; background: none; color: var(--muted); font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; }
 .chips button { position: relative; min-width: 44px; min-height: 36px; padding: 0 12px; border-radius: 99px; border: 1.5px solid var(--line); background: var(--card); cursor: pointer; font-size: 13px; font-weight: 600; transition: background-color .15s, color .15s, border-color .15s; }
-.chips button::after { content: ''; position: absolute; inset: -4px 0; }
+.chips button::after { content: ''; position: absolute; inset: -5.5px -1.5px; }
 .chips button.on { background: var(--accent-soft); border-color: var(--accent-soft); color: var(--accent-ink); font-weight: 700; }
 
 /* Gastos and the routine calendar: ‹ month › */
