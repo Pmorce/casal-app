@@ -19,6 +19,8 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      // the bundled fonts must be precached too, or the app opens without them offline
+      workbox: { globPatterns: ['**/*.{js,css,html,woff2}'] },
       pwaAssets: { image: 'public/icon.svg', overrideManifestIcons: true },
       manifest: {
         name: 'Casa',
@@ -28,8 +30,8 @@ export default defineConfig({
         display: 'standalone',
         start_url: './',
         scope: './',
-        background_color: '#f6f7f6',
-        theme_color: '#2a9d63',
+        background_color: '#FBF6F2',
+        theme_color: '#F6D6DC',
       },
     }),
   ],
