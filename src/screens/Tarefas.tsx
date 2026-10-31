@@ -79,7 +79,7 @@ export default function Tarefas() {
                 {c.title}
                 <div className="note">
                   {c.kind === 'semanal' ? `semanal · ${WEEKDAY_LABELS_PT[c.weekday ?? 0]}` : KINDS.find(k => k.value === c.kind)!.label.toLowerCase()}
-                  {c.lastDoneKey && ` · feita por ${members[c.lastDoneBy ?? ''] ?? '?'}, ${when(c.lastDoneKey, today)}`}
+                  {c.lastDoneKey && ` · feita por ${members[c.lastDoneBy ?? ''] ?? 'Desconhecido'}, ${when(c.lastDoneKey, today)}`}
                 </div>
               </div>
               {c.lastDoneBy && <Avatar uid={c.lastDoneBy} size="sm" decorative />}
