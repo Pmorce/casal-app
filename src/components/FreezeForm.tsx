@@ -3,6 +3,7 @@ import { freezeBought, type FrozenBatch } from '../data/freezerRepo'
 import { freezeDefaults, parseAmount } from '../domain/freezer'
 import type { DateKey } from '../domain/dates'
 import type { FreezerUnit, Product } from '../domain/types'
+import { Badge } from './Icon'
 
 const UNITS: { value: FreezerUnit; label: string }[] = [
   { value: 'un', label: 'un.' },
@@ -55,14 +56,19 @@ export default function FreezeForm({ products, today, onSaved, onDone }: Props) 
 
   return (
     <form className="card" onSubmit={save} ref={form}>
-      <div className="card-title">🧊 Para o congelador</div>
-      <p className="small muted" style={{ marginTop: 0 }}>Um saco por produto, como veio. Em casa podem dividir.</p>
+      <div className="card-head">
+        <Badge icon="congelador" tone="ceu" />
+        <div className="grow">
+          <h2>Para o congelador</h2>
+          <div className="note">Um saco por produto, como veio. Em casa podem dividir.</div>
+        </div>
+      </div>
       {rows.map(r => (
-        <div key={r.product.id} style={{ marginBottom: 10 }}>
-          <div className="inline" style={{ alignItems: 'center' }}>
-            <strong className="grow">{r.product.name}</strong>
+        <div className="freeze-row" key={r.product.id}>
+          <div className="freeze-head">
+            <strong className="grow product-name">{r.product.name}</strong>
             <input className="input" inputMode="decimal" placeholder="ex.: 2,5" aria-label={`Quantidade de ${r.product.name}`}
-              value={r.amount} onChange={e => change(r.product.id, { amount: e.target.value })} style={{ width: 90, flex: 'none' }} />
+              value={r.amount} onChange={e => change(r.product.id, { amount: e.target.value })} />
           </div>
           <div className="seg compact" style={{ marginTop: 6 }}>
             {UNITS.map(u => (
@@ -74,7 +80,7 @@ export default function FreezeForm({ products, today, onSaved, onDone }: Props) 
         </div>
       ))}
       <button className="btn primary block">Guardar</button>
-      <button type="button" className="link-btn" onClick={onDone}>Agora não</button>
+      <button type="button" className="btn ghost block" onClick={onDone}>Agora não</button>
     </form>
   )
 }

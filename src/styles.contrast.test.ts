@@ -54,6 +54,10 @@ describe.each([['light', light], ['dark', dark]] as const)('%s theme', (_, t) =>
   test('the undo toast action reads on the toast (--text background)', () => {
     expect(contrast(t['--accent-inverse'], t['--text'])).toBeGreaterThanOrEqual(4.5)
   })
+
+  test('the undo toast message reads on the toast (--bg on --text)', () => {
+    expect(contrast(t['--bg'], t['--text'])).toBeGreaterThanOrEqual(4.5)
+  })
 })
 
 test('white reads on the filled primary button in light mode', () => {

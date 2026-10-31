@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import Icon from './Icon'
 
 export interface UndoToastProps {
   message: string
@@ -28,7 +29,7 @@ export default function UndoToast({ message, onUndo, onClose, action, onDismiss 
         <span className="toast-actions">
           <button className="toast-main" onClick={() => { action.run(); onClose() }}>{action.label}</button>
           <button onClick={() => { onUndo(); onClose() }}>Desfazer</button>
-          <button aria-label="Fechar" onClick={() => { onDismiss?.(); onClose() }}>✕</button>
+          <button className="toast-x" aria-label="Fechar" onClick={() => { onDismiss?.(); onClose() }}><Icon name="x" /></button>
         </span>
       </div>
     )

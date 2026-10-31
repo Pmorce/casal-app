@@ -38,6 +38,19 @@ test('three tabs, Outros shows its bags', () => {
   expect(screen.queryByText('Bifes')).toBeNull()
 })
 
+test('the header counts every bag and the groups to use first, in all categories', () => {
+  data.bags = [
+    bag({ name: 'Bifes', addedKey: '2026-06-01' }), bag({ name: 'Bifes', addedKey: '2026-10-20' }),
+    bag({ name: 'Sopa', category: 'feita', addedKey: '2026-05-01' }), bag({ name: 'Gelado', category: 'outros' }),
+  ]
+  const { unmount } = renderIt()
+  expect(screen.getByText('4 sacos · 2 para gastar primeiro')).toBeTruthy()
+  unmount()
+  data.bags = [bag({ name: 'Gelado', category: 'outros', addedKey: '2026-10-20' })]
+  renderIt()
+  expect(screen.getByText('1 saco')).toBeTruthy()
+})
+
 test('Novo saco offers the three categories', () => {
   renderIt()
   fireEvent.click(screen.getByRole('button', { name: '+ Novo saco' }))

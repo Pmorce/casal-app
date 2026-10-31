@@ -161,7 +161,7 @@ export default function Compras() {
           <FreezeForm products={freezing} today={today}
             onSaved={batch => { savedBags.current = [...savedBags.current, batch] }} onDone={() => setFreezing(null)} />
         )}
-        {askSpent && !freezing && <SpentForm title="✓ Compras terminadas. Quanto foi?" today={today} onDone={() => setAskSpent(false)} />}
+        {askSpent && !freezing && <SpentForm title="Compras terminadas. Quanto foi?" today={today} onDone={() => setAskSpent(false)} />}
 
         {cart.length > 0 && (
           <>

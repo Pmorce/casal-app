@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useSession } from '../data/session'
 import { addExpense } from '../data/expensesRepo'
 import { parseEuros } from '../domain/expenses'
+import { Badge } from './Icon'
 import type { DateKey } from '../domain/dates'
 
 /** "Quanto foi?" straight into Gastos; scrolls itself into view so it is never off-screen. */
@@ -24,7 +25,10 @@ export default function SpentForm({ title, today, onDone }: { title: string; tod
 
   return (
     <form className="card" onSubmit={submit} ref={form}>
-      <div className="card-title">{title}</div>
+      <div className="card-head">
+        <Badge icon="euro" tone="rosa" />
+        <h2 className="grow">{title}</h2>
+      </div>
       <div className="inline">
         <input className="input" inputMode="decimal" placeholder="Valor (ex.: 47,30)" value={spent} autoFocus
           onChange={e => { setSpent(e.target.value); setError('') }} />
@@ -36,7 +40,7 @@ export default function SpentForm({ title, today, onDone }: { title: string; tod
         ))}
       </div>
       {error && <p className="small error">{error}</p>}
-      <button type="button" className="link-btn" onClick={onDone}>Agora não</button>
+      <button type="button" className="btn ghost block" onClick={onDone}>Agora não</button>
     </form>
   )
 }

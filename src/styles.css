@@ -251,6 +251,35 @@ h2 { font-size: 16px; font-weight: 800; margin: 18px 0 8px; }
 .toast-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; }
 .toast.offer button { color: var(--muted); }
 .toast.offer .toast-main { background: var(--accent-strong); color: var(--on-accent); border-radius: 14px; padding: 8px 14px; }
+.toast .toast-x { min-width: 44px; display: grid; place-items: center; }
+.toast-x svg { width: 18px; height: 18px; stroke-width: 2.2; }
+/* Congelador: each group has its category icon, the name and a round «− {bags} +» selector; open, its bags are small --bg cards */
+.btn.dashed { margin-bottom: 12px; border-style: dashed; border-color: var(--blob); background: none; color: var(--accent-ink); font-weight: 800; }
+.group { display: flex; align-items: center; gap: 10px; }
+.group-open { flex: 1; min-width: 0; min-height: 44px; padding: 0; border: none; background: none; color: inherit; text-align: left; cursor: pointer; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; }
+.seg.cats button { flex: 1 1 auto; padding: 0 8px; font-size: 14px; }
+.old-tag { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; padding: 2px 8px; border-radius: 12px; background: var(--accent-soft); color: var(--accent-ink); font-size: 12px; font-weight: 700; }
+.old-tag svg { width: 12px; height: 12px; stroke-width: 2.2; }
+.stepper { flex: none; display: inline-flex; align-items: center; padding: 3px; border-radius: 99px; background: var(--wash); }
+.stepper b { min-width: 24px; text-align: center; font-size: 15px; }
+.stepper button { position: relative; width: 32px; height: 32px; padding: 0; border: none; border-radius: 50%; background: var(--card); color: var(--accent-ink); box-shadow: 0 1px 3px rgba(59, 42, 53, .12); display: grid; place-items: center; cursor: pointer; }
+.stepper button::after { content: ''; position: absolute; inset: -6px; }
+.stepper svg { width: 16px; height: 16px; stroke-width: 2.4; }
+.field > .stepper { align-self: flex-start; }
+.bags { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1.5px dashed var(--line); }
+.bag { display: flex; flex-wrap: wrap; align-items: center; column-gap: 8px; padding: 0 4px 0 12px; border-radius: 14px; background: var(--bg); font-size: 13px; }
+.bag > .grow { flex: 1 1 120px; padding: 6px 0; }
+.bag-actions { margin-left: auto; display: flex; }
+.bag-actions .link-btn { padding: 8px 7px; font-size: 13px; }
+.bag-form { padding: 6px 0 2px; }
+.bag-form-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.bag-form-row .input { flex: 1 1 90px; width: auto; min-width: 0; }
+.bag-amount { flex: 1 1 130px; display: flex; align-items: center; gap: 8px; }
+.form-actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 8px; }
+/* Para o congelador: one row per product, the amount beside the name and the units under it */
+.freeze-row { margin-bottom: 12px; }
+.freeze-head { display: flex; align-items: center; gap: 8px; }
+.freeze-head .input { flex: none; width: 96px; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0s !important; animation-duration: 0s !important; scroll-behavior: auto !important; }

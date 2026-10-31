@@ -52,7 +52,7 @@ export default {
     await page.getByRole('button', { name: 'Guardar' }).click()
     await expectText(page, 'Quantidade inválida', 'bad quantity rejected')
     await page.getByPlaceholder('ex.: 2 ou 2,5').fill('2')
-    for (let i = 0; i < 3; i++) await page.getByRole('button', { name: '+', exact: true }).click()
+    for (let i = 0; i < 3; i++) await page.getByRole('button', { name: 'Mais um saco', exact: true }).click()
     await page.getByRole('button', { name: 'Guardar' }).click()
     await expectText(page, '4 sacos · 8 un.', '4 bags · 8 units')
     const minus = page.getByRole('button', { name: 'Tirar um saco de Bifes de frango' })

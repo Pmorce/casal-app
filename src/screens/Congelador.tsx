@@ -10,11 +10,26 @@ import { CATEGORIES, groupBags, isOld, maxSplit, parseAmount, splitAmounts, summ
 import { daysBetween, type DateKey } from '../domain/dates'
 import type { FreezerBag, Product, ShoppingItem } from '../domain/types'
 import UndoToast from '../components/UndoToast'
+import PageHeader from '../components/PageHeader'
+import Icon, { Badge, type IconName, type Tone } from '../components/Icon'
 import NovoSaco from './NovoSaco'
 
 const num = new Intl.NumberFormat('pt-PT', { maximumFractionDigits: 2 })
 const UNIT_LABEL = { un: 'un.', g: 'g', kg: 'kg', doses: 'doses' } as const
 const ptNum = (n: number) => num.format(n).replace(/\s/g, '')
+// the category's icon by each group (spec §3.4); Comida feita is pêssego, the others the Congelador's céu (§3.1)
+const CATEGORY_LOOK: Record<FreezerBag['category'], { icon: IconName; tone: Tone }> = {
+  carne: { icon: 'peixe', tone: 'ceu' },
+  feita: { icon: 'panela', tone: 'pessego' },
+  outros: { icon: 'floco', tone: 'ceu' },
+}
+
+/** «{n} sacos · {k} para gastar primeiro» over every category; k = groups whose oldest bag is old. */
+function headerSub(bags: FreezerBag[], today: DateKey): string {
+  const n = `${bags.length} ${bags.length === 1 ? 'saco' : 'sacos'}`
+  const k = groupBags(bags).filter(g => isOld(g.bags[0], today)).length
+  return k ? `${n} · ${k} para gastar primeiro` : n
+}
 
 function age(addedKey: string, today: string): string {
   const days = daysBetween(addedKey, today)
@@ -73,55 +88,68 @@ export default function Congelador() {
 
   return (
     <>
-      <h1>Congelador</h1>
-      <div className="seg">
-        {CATEGORIES.map(c => (
-          <button key={c.value} className={category === c.value ? 'on' : ''} onClick={() => setCategory(c.value)}>{c.label}</button>
-        ))}
-      </div>
+      <PageHeader title="Congelador" sub={headerSub(bags, today)} />
+      <div className="lift">
+        <div className="seg cats">
+          {CATEGORIES.map(c => (
+            <button key={c.value} className={category === c.value ? 'on' : ''} onClick={() => setCategory(c.value)}>{c.label}</button>
+          ))}
+        </div>
 
+        {adding ? (
+          <NovoSaco category={category} names={names} today={today} onDone={() => setAdding(false)} />
+        ) : (
+          <button className="btn dashed block" onClick={() => setAdding(true)}>+ Novo saco</button>
+        )}
 
-      {adding ? (
-        <NovoSaco category={category} names={names} today={today} onDone={() => setAdding(false)} />
-      ) : (
-        <button className="btn block" style={{ marginBottom: 10 }} onClick={() => setAdding(true)}>+ Novo saco</button>
-      )}
-
-      {!groups.length && <p className="muted center" style={{ minHeight: 120 }}>Nada aqui ainda.</p>}
-      {groups.map(g => {
-        const oldest = g.bags[0]
-        return (
-          <div className="card" key={g.key}>
-            <div className="row">
-              <button className="grow link-btn" style={{ textAlign: 'left', color: 'inherit', padding: 0 }} onClick={() => setOpen(open === g.key ? null : g.key)}>
-                <strong>{g.name}</strong>
-                <div className="note">{summary(g)}</div>
-                {isOld(oldest, today) && <div className="note" style={{ color: 'var(--danger)' }}>mais antigo entrou {age(oldest.addedKey, today)}</div>}
-              </button>
-              <button className="icon-btn" aria-label={`Tirar um saco de ${g.name}`} onClick={() => minus(g)}>−</button>
-              <button className="icon-btn" aria-label={`Mais um saco de ${g.name}`} onClick={() => addSameAsLast(g, today)}>+</button>
-            </div>
-            {open === g.key && g.bags.map((b, i) => {
-              if (fixing === b.id) return <FixBag key={b.id} bag={b} today={today} onDone={() => setFixing(null)} />
-              if (splitting === b.id) return <SplitBag key={b.id} bag={b} onSplit={amounts => split(b, amounts)} onCancel={() => setSplitting(null)} />
-              const what = `${num.format(b.amount)} ${UNIT_LABEL[b.unit]}, entrou ${age(b.addedKey, today)}`
-              // distinct names: a group often has several identical bags (screen readers)
-              const label = (verb: string) => `${verb} o saco ${i + 1} (${what})`
-              return (
-                <div className="row small" key={b.id}>
-                  <span className="grow">{num.format(b.amount)} {UNIT_LABEL[b.unit]} · entrou {age(b.addedKey, today)}</span>
-                  <button className="link-btn" aria-label={label('Corrigir')} onClick={() => { setSplitting(null); setFixing(b.id) }}>Corrigir</button>
-                  {maxSplit(b.amount) >= 2 && (
-                    <button className="link-btn" aria-label={label('Dividir')} onClick={() => { setFixing(null); setSplitting(b.id) }}>Dividir</button>
-                  )}
-                  <button className="link-btn" aria-label={label('Apagar')}
-                    onClick={() => { deleteBag(b.id); setUndo({ message: 'Saco apagado', run: () => restoreBag(b) }) }}>Apagar</button>
+        {!groups.length && <p className="muted center" style={{ minHeight: 120 }}>Nada aqui ainda.</p>}
+        {groups.map(g => {
+          const oldest = g.bags[0]
+          const look = CATEGORY_LOOK[g.category]
+          return (
+            <div className="card" key={g.key}>
+              <div className="group">
+                <Badge icon={look.icon} tone={look.tone} />
+                <button className="group-open" onClick={() => setOpen(open === g.key ? null : g.key)}>
+                  <strong className="product-name">{g.name}</strong>
+                  <span className="note">{summary(g)}</span>
+                  {isOld(oldest, today) && <span className="old-tag"><Icon name="relogio" />mais antigo {age(oldest.addedKey, today)}</span>}
+                </button>
+                {/* − {bags} +: one round selector, its buttons keep a 44px hit area */}
+                <span className="stepper">
+                  <button aria-label={`Tirar um saco de ${g.name}`} onClick={() => minus(g)}><Icon name="menos" /></button>
+                  <b>{g.bags.length}</b>
+                  <button aria-label={`Mais um saco de ${g.name}`} onClick={() => addSameAsLast(g, today)}><Icon name="mais1" /></button>
+                </span>
+              </div>
+              {open === g.key && (
+                <div className="bags">
+                  {g.bags.map((b, i) => {
+                    if (fixing === b.id) return <FixBag key={b.id} bag={b} today={today} onDone={() => setFixing(null)} />
+                    if (splitting === b.id) return <SplitBag key={b.id} bag={b} onSplit={amounts => split(b, amounts)} onCancel={() => setSplitting(null)} />
+                    const what = `${num.format(b.amount)} ${UNIT_LABEL[b.unit]}, entrou ${age(b.addedKey, today)}`
+                    // distinct names: a group often has several identical bags (screen readers)
+                    const label = (verb: string) => `${verb} o saco ${i + 1} (${what})`
+                    return (
+                      <div className="bag" key={b.id}>
+                        <span className="grow">{num.format(b.amount)} {UNIT_LABEL[b.unit]} · entrou {age(b.addedKey, today)}</span>
+                        <span className="bag-actions">
+                          <button className="link-btn" aria-label={label('Corrigir')} onClick={() => { setSplitting(null); setFixing(b.id) }}>Corrigir</button>
+                          {maxSplit(b.amount) >= 2 && (
+                            <button className="link-btn" aria-label={label('Dividir')} onClick={() => { setFixing(null); setSplitting(b.id) }}>Dividir</button>
+                          )}
+                          <button className="link-btn" aria-label={label('Apagar')}
+                            onClick={() => { deleteBag(b.id); setUndo({ message: 'Saco apagado', run: () => restoreBag(b) }) }}>Apagar</button>
+                        </span>
+                      </div>
+                    )
+                  })}
                 </div>
-              )
-            })}
-          </div>
-        )
-      })}
+              )}
+            </div>
+          )
+        })}
+      </div>
 
       {undo && (
         <UndoToast message={undo.message} onUndo={undo.run} onClose={closeUndo}
@@ -155,21 +183,25 @@ function SplitBag({ bag, onSplit, onCancel }: { bag: FreezerBag; onSplit: (amoun
   }
 
   return (
-    <form className="small" onSubmit={save} style={{ padding: '6px 0' }}>
-      <div className="inline" style={{ alignItems: 'center' }}>
-        <button type="button" className="icon-btn" aria-label="Menos sacos" onClick={() => setCount(Math.max(2, count - 1))}>−</button>
-        <strong style={{ minWidth: 24, textAlign: 'center' }}>{count}</strong>
-        <button type="button" className="icon-btn" aria-label="Mais sacos" onClick={() => setCount(Math.min(most, count + 1))}>+</button>
+    <form className="bag-form small" onSubmit={save}>
+      <div className="bag-form-row">
+        <span className="stepper">
+          <button type="button" aria-label="Menos sacos" onClick={() => setCount(Math.max(2, count - 1))}><Icon name="menos" /></button>
+          <b>{count}</b>
+          <button type="button" aria-label="Mais sacos" onClick={() => setCount(Math.min(most, count + 1))}><Icon name="mais1" /></button>
+        </span>
         <span>sacos de</span>
-        <input className="input" inputMode="decimal" aria-label="Quantidade por saco" value={typed ?? ptNum(parts[0])}
-          onChange={e => { setTyped(e.target.value); setError('') }} style={{ flex: 1, minWidth: 0 }} />
-        <span>{UNIT_LABEL[bag.unit]}</span>
+        <span className="bag-amount">
+          <input className="input" inputMode="decimal" aria-label="Quantidade por saco" value={typed ?? ptNum(parts[0])}
+            onChange={e => { setTyped(e.target.value); setError('') }} />
+          <span>{UNIT_LABEL[bag.unit]}</span>
+        </span>
       </div>
       {newTotal !== null && newTotal !== bag.amount && (
         <p className="note">Total: {ptNum(newTotal)} {UNIT_LABEL[bag.unit]} (era {ptNum(bag.amount)} {UNIT_LABEL[bag.unit]})</p>
       )}
       {error && <p className="error">{error}</p>}
-      <div className="inline" style={{ justifyContent: 'flex-end' }}>
+      <div className="form-actions">
         <button type="button" className="link-btn" onClick={onCancel}>Cancelar</button>
         <button className="btn primary small">Dividir em {count}</button>
       </div>
@@ -193,16 +225,18 @@ function FixBag({ bag, today, onDone }: { bag: FreezerBag; today: DateKey; onDon
   }
 
   return (
-    <form className="small" onSubmit={save} style={{ padding: '6px 0' }}>
-      <div className="inline" style={{ alignItems: 'center' }}>
-        <input className="input" inputMode="decimal" aria-label="Quantidade" value={amount}
-          onChange={e => { setAmount(e.target.value); setError('') }} style={{ flex: 1 }} />
-        <span>{UNIT_LABEL[bag.unit]}</span>
+    <form className="bag-form small" onSubmit={save}>
+      <div className="bag-form-row">
+        <span className="bag-amount">
+          <input className="input" inputMode="decimal" aria-label="Quantidade" value={amount}
+            onChange={e => { setAmount(e.target.value); setError('') }} />
+          <span>{UNIT_LABEL[bag.unit]}</span>
+        </span>
         <input className="input" type="date" aria-label="Data de entrada" max={today} value={addedKey}
-          onChange={e => { setAddedKey(e.target.value); setError('') }} style={{ flex: 1 }} />
+          onChange={e => { setAddedKey(e.target.value); setError('') }} />
       </div>
       {error && <p className="error">{error}</p>}
-      <div className="inline" style={{ justifyContent: 'flex-end' }}>
+      <div className="form-actions">
         <button type="button" className="link-btn" onClick={onDone}>Cancelar</button>
         <button className="btn primary small">Guardar</button>
       </div>
