@@ -66,7 +66,7 @@ export default function RotinaEditar() {
 
     return (
       <>
-        <PageHeader title="Editar rotina" back={BACK_EDITING} />
+        <PageHeader title="Editar rotina" back={isNew ? BACK_EDITING : BACK} />
         <div className="lift">
           <div className="card">
             <label className="field"><span>Nome</span>

@@ -21,7 +21,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       // the bundled fonts must be precached too, or the app opens without them offline
       workbox: { globPatterns: ['**/*.{js,css,html,woff2}'] },
-      pwaAssets: { image: 'public/icon.svg', overrideManifestIcons: true },
+      pwaAssets: { image: 'public/icon.svg', overrideManifestIcons: true, injectThemeColor: false },
       manifest: {
         name: 'Casa',
         short_name: 'Casa',

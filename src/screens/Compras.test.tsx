@@ -91,9 +91,9 @@ test('"Talvez falte" shows overdue products with Falta and Ainda há', () => {
   data.products = [prod({ id: 'c', name: 'Café', boughtKeys: ['2026-09-01', '2026-09-11', '2026-09-21'] })]
   renderIt()
   expect(screen.getByText(/costuma durar ~10 dias · vai em 38/)).toBeTruthy()
-  fireEvent.click(screen.getByRole('button', { name: 'Falta' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Falta Café' }))
   expect(repo.markMissing).toHaveBeenCalled()
-  fireEvent.click(screen.getByRole('button', { name: 'Ainda há' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Ainda há Café' }))
   expect(repo.snooze).toHaveBeenCalledWith(expect.objectContaining({ id: 'c' }), '2026-10-29')
 })
 

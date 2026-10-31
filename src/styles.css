@@ -176,6 +176,7 @@ h2 { font-size: 16px; font-weight: 800; margin: 18px 0 8px; }
 
 .input { width: 100%; min-height: 46px; padding: 0 14px; border-radius: 16px; border: 1.5px solid transparent; background: var(--wash); transition: border-color .15s, background-color .15s; }
 .input:focus { outline: none; border-color: var(--accent); background: var(--card); }
+.input::placeholder { color: var(--muted); }
 .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
 .field > span { font-size: 13px; font-weight: 600; color: var(--muted); }
 .inline { display: flex; gap: 8px; }

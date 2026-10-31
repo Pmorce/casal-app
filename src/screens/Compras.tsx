@@ -148,8 +148,8 @@ export default function Compras() {
                   <div className="note">{m.reason === 'congelador' ? 'não há no congelador' : `costuma durar ~${shownGap(m.gap)} dias · vai em ${m.since}`}</div>
                 </div>
                 <div className="product-actions">
-                  <button className="chip quiet" onClick={() => snooze(m.product, today)}>Ainda há</button>
-                  <button className="chip" onClick={() => markMissing(m.product, uid, items)}>Falta</button>
+                  <button className="chip quiet" aria-label={`Ainda há ${m.product.name}`} onClick={() => snooze(m.product, today)}>Ainda há</button>
+                  <button className="chip" aria-label={`Falta ${m.product.name}`} onClick={() => markMissing(m.product, uid, items)}>Falta</button>
                 </div>
               </div>
             ))}

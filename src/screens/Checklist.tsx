@@ -45,7 +45,7 @@ export default function Checklist() {
     }
     return (
       <>
-        <PageHeader title="Editar checklist" back={BACK_EDITING} />
+        <PageHeader title="Editar checklist" back={isNew ? BACK_EDITING : BACK} />
         <div className="lift">
           <div className="card">
             <label className="field"><span>Nome</span>
