@@ -47,9 +47,10 @@ test('editing an existing routine, ‹ goes to Rotinas (push), not back over the
 test('editing a NEW routine, ‹ goes back in history (no replayable editor entry left)', async () => {
   data.routines = []
   vi.spyOn(window, 'confirm').mockReturnValue(true)
+  window.history.replaceState({ idx: 1 }, '') // an in-app entry behind, as React Router's browser histories record it
   const router = await backFrom(['/mais/rotinas', { pathname: '/mais/rotinas/n1', search: '?editar=1', state: { novo: routine({ id: 'n1', ownerUid: 'P' }) } }])
   expect(screen.getByText('rotinas')).toBeTruthy()
   expect(router.state.historyAction).toBe('POP')
 })
 
-afterEach(() => vi.restoreAllMocks())
+afterEach(() => { vi.restoreAllMocks(); window.history.replaceState(null, '') })

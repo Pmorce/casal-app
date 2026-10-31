@@ -43,7 +43,7 @@ export default function RoutineToday({ ownerUid, day }: { ownerUid: string; day:
                 <div className="grow">
                   <div className={on ? 'done-text' : ''}>{s.text}</div>
                   {s.note && <div className="note">{s.note}</div>}
-                  {s.checklistId && <Link className="note" to={`/mais/checklists/${s.checklistId}`}>abrir checklist →</Link>}
+                  {s.checklistId && <Link className="note note-link" to={`/mais/checklists/${s.checklistId}`}>abrir checklist<Icon name="seta" size={14} /></Link>}
                 </div>
                 {routines.length > 1 && <span className="small muted">{r.name}</span>}
               </div>
