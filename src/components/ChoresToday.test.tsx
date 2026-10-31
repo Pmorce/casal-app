@@ -13,3 +13,9 @@ test('the avatar announces who did the chore last', () => {
   render(<ChoresToday />)
   expect(screen.getByRole('img', { name: 'feita por último por Rui' })).toBeTruthy()
 })
+
+test('an unknown member is announced as Desconhecido', () => {
+  data.chores = [{ id: 'c', title: 'Lixo', kind: 'diaria', lastDoneBy: 'Z', lastDoneKey: '2026-10-28', createdKey: '2026-10-01' }]
+  render(<ChoresToday />)
+  expect(screen.getByRole('img', { name: 'feita por último por Desconhecido' })).toBeTruthy()
+})

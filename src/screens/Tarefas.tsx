@@ -82,7 +82,7 @@ export default function Tarefas() {
                   {c.lastDoneKey && ` · feita por ${members[c.lastDoneBy ?? ''] ?? '?'}, ${when(c.lastDoneKey, today)}`}
                 </div>
               </div>
-              {c.lastDoneBy && <Avatar uid={c.lastDoneBy} size="sm" />}
+              {c.lastDoneBy && <Avatar uid={c.lastDoneBy} size="sm" decorative />}
               <button className="x-btn" aria-label={`Apagar ${c.title}`} onClick={() => { deleteChore(c.id); setUndo(c) }}><Icon name="x" /></button>
             </div>
           ))}

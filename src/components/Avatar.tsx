@@ -1,12 +1,13 @@
 import { useSession } from '../data/session'
 import { memberColor } from '../domain/look'
 
-/** A member's initial in their colour (pink or sky blue); an unknown uid gets a neutral «?». `label` overrides the accessible name. */
-export default function Avatar({ uid, size = 'md', label }: { uid: string; size?: 'sm' | 'md'; label?: string }) {
+/** A member's initial in their colour (pink or sky blue); an unknown uid gets a neutral «?». `label` overrides the accessible name; `decorative` hides it from screen readers (the name is already in the text next to it). */
+export default function Avatar({ uid, size = 'md', label, decorative }: { uid: string; size?: 'sm' | 'md'; label?: string; decorative?: boolean }) {
   const { members } = useSession()
   const { bg, ink, initial } = memberColor(uid, members)
   return (
-    <span className={`avatar ${size}`} style={{ background: bg, color: ink }} role="img" aria-label={label ?? members[uid] ?? 'Desconhecido'}>
+    <span className={`avatar ${size}`} style={{ background: bg, color: ink }}
+      {...(decorative ? { 'aria-hidden': true } : { role: 'img', 'aria-label': label ?? members[uid] ?? 'Desconhecido' })}>
       {initial}
     </span>
   )
