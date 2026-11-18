@@ -15,12 +15,6 @@ export function activeTrip(meta: { id: string }[], today: DateKey): Trip | null 
   return t && t.dateKey === today ? t : null
 }
 
-/** A trip left over from an earlier day. */
-export function staleTrip(meta: { id: string }[], today: DateKey): Trip | null {
-  const t = tripDoc(meta)
-  return t && t.dateKey < today ? t : null
-}
-
 export function customStores(meta: { id: string }[]): string[] {
   const d = meta.find(m => m.id === 'stores') as { custom?: string[] } | undefined
   return d?.custom ?? []

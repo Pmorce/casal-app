@@ -5,9 +5,11 @@ import { item, part, prod } from '../domain/testFactories'
 import type { FreezerBag, Product, ShoppingItem, Trip } from '../domain/types'
 
 const data = vi.hoisted(() => ({ shopping: [] as ShoppingItem[], products: [] as Product[], bags: [] as FreezerBag[], meta: [] as { id: string }[] }))
+// every subscription the screen opens, with its filter
+const subs = vi.hoisted(() => [] as [string, unknown][])
 vi.mock('../data/useCollection', () => ({
-  useCollection: (path: string) =>
-    (path === 'shopping' ? data.shopping : path === 'products' ? data.products : path === 'freezerBags' ? data.bags : path === 'meta' ? data.meta : []),
+  useCollection: (path: string, filter?: unknown) =>
+    (subs.push([path, filter]), path === 'shopping' ? data.shopping : path === 'products' ? data.products : path === 'freezerBags' ? data.bags : path === 'meta' ? data.meta : []),
 }))
 vi.mock('../data/session', () => ({ useSession: () => ({ uid: 'P', name: 'Ana', members: { P: 'Ana', B: 'Rui' } }) }))
 vi.mock('../hooks/useToday', () => ({ useToday: () => '2026-10-29' }))
@@ -28,7 +30,7 @@ const freezer = vi.hoisted(() => ({ freezeBought: vi.fn((): unknown => null), un
 vi.mock('../data/freezerRepo', () => freezer)
 
 const renderIt = () => render(<MemoryRouter><Compras /></MemoryRouter>)
-beforeEach(() => { vi.clearAllMocks(); data.products = []; data.bags = []; data.meta = []; freezer.freezeBought.mockReturnValue(frozen) })
+beforeEach(() => { vi.clearAllMocks(); subs.length = 0; data.products = []; data.bags = []; data.meta = []; freezer.freezeBought.mockReturnValue(frozen) })
 /** "Terminar compras"; with untagged ticks and no trip it first asks "Onde foi?", answered with "Não digo". */
 function terminar() {
   fireEvent.click(screen.getByRole('button', { name: /Terminar compras/ }))
@@ -51,6 +53,24 @@ test('an empty list says so in words, with no emoji', () => {
   data.shopping = []
   renderIt()
   expect(screen.getByText('Nada por comprar')).toBeTruthy()
+})
+
+test('with everything ticked it says "Tudo no carrinho", not "Nada por comprar", and a done zone shows ✓ instead of 0', () => {
+  data.products = [prod({ id: 'l', location: 'frigorifico' }), prod({ id: 'a', location: 'despensa' })]
+  data.shopping = [item({ text: 'Leite', productId: 'l', status: 'carrinho' }), item({ text: 'Arroz', productId: 'a' })]
+  const { unmount } = renderIt()
+  expect(screen.getByLabelText('Frigorífico: tudo no carrinho')).toBeTruthy()
+  expect(screen.queryByLabelText('Despensa: tudo no carrinho')).toBeNull()
+  expect(screen.queryByText('Tudo no carrinho')).toBeNull()
+  unmount()
+
+  data.shopping = [item({ text: 'Leite', productId: 'l', status: 'carrinho' }), item({ text: 'Arroz', productId: 'a', status: 'carrinho' })]
+  const { container } = renderIt()
+  expect(screen.getByText('Tudo no carrinho')).toBeTruthy()
+  expect(screen.queryByText('Nada por comprar')).toBeNull()
+  const counts = [...container.querySelectorAll('.zone-count')].map(c => c.textContent)
+  expect(counts).not.toContain('0')
+  expect(screen.getByLabelText('Despensa: tudo no carrinho')).toBeTruthy()
 })
 
 test('shows who added each item', () => {
@@ -225,7 +245,8 @@ const lidl: Trip = { id: 'trip', store: 'Lidl', stores: ['Lidl'], startedBy: 'P'
 test('"Iniciar compras" asks where and starts the trip', () => {
   renderIt()
   fireEvent.click(screen.getByRole('button', { name: 'Iniciar compras' }))
-  expect(screen.getByText('Onde foi?')).toBeTruthy()
+  expect(screen.getByRole('heading', { name: 'Em que loja estás?' })).toBeTruthy()
+  expect(screen.queryByText('Onde foi?')).toBeNull()
   expect(screen.queryByRole('button', { name: 'Não digo' })).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: 'Lidl' }))
   expect(trips.startTrip).toHaveBeenCalledWith('Lidl', 'P', '2026-10-29')
@@ -240,7 +261,7 @@ test('with an active trip the tick takes the store', () => {
   expect(repo.toggleCart).toHaveBeenCalledWith(expect.objectContaining({ text: 'Café' }), 'Lidl')
 })
 
-test("yesterday's trip counts as no trip and is left once, quietly", () => {
+test("yesterday's trip counts as no trip and is never deleted (the cache may be older than today's trip)", () => {
   data.meta = [{ ...lidl, dateKey: '2026-10-28' } as Trip]
   data.shopping = [item({ text: 'Café' })]
   const { rerender } = renderIt()
@@ -248,13 +269,23 @@ test("yesterday's trip counts as no trip and is left once, quietly", () => {
   fireEvent.click(screen.getByRole('button', { name: 'Café' }))
   expect(repo.toggleCart).toHaveBeenCalledWith(expect.objectContaining({ text: 'Café' }), undefined)
   rerender(<MemoryRouter><Compras /></MemoryRouter>)
-  expect(trips.leaveTrip).toHaveBeenCalledTimes(1)
+  expect(trips.leaveTrip).not.toHaveBeenCalled()
+  expect(screen.getByRole('button', { name: 'Iniciar compras' })).toBeTruthy()
+})
+
+test('the purchases that rank the stores are only the last year, with a filter stable across renders', () => {
+  const { rerender } = renderIt()
+  rerender(<MemoryRouter><Compras /></MemoryRouter>)
+  const filters = subs.filter(([path]) => path === 'purchases').map(([, f]) => JSON.stringify(f))
+  expect(filters.length).toBeGreaterThan(1)
+  expect(new Set(filters)).toEqual(new Set([JSON.stringify(['dateKey', '>=', '2025-10-29'])]))
 })
 
 test('"Mudar de loja" changes the store of the trip', () => {
   data.meta = [lidl]
   renderIt()
   fireEvent.click(screen.getByRole('button', { name: 'Mudar de loja' }))
+  expect(screen.getByRole('heading', { name: 'Em que loja estás?' })).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'Continente' }))
   expect(trips.changeStore).toHaveBeenCalledWith(expect.objectContaining({ store: 'Lidl' }), 'Continente')
 })
@@ -271,8 +302,9 @@ test('"Sair" leaves the trip and offers undo', () => {
 test('"Cancelar" closes the store picker without writing', () => {
   renderIt()
   fireEvent.click(screen.getByRole('button', { name: 'Iniciar compras' }))
+  expect(screen.getByText('Em que loja estás?')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
-  expect(screen.queryByText('Onde foi?')).toBeNull()
+  expect(screen.queryByText('Em que loja estás?')).toBeNull()
   expect(trips.startTrip).not.toHaveBeenCalled()
 })
 

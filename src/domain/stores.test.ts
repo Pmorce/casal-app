@@ -1,18 +1,15 @@
 import { describe, expect, test } from 'vitest'
-import { STORES, activeTrip, customStores, staleTrip, storeOptions } from './stores'
+import { STORES, activeTrip, customStores, storeOptions } from './stores'
 import { purchase } from './testFactories'
 
 const trip = (dateKey: string) => ({ id: 'trip', store: 'Lidl', stores: ['Lidl'], startedBy: 'Ana', dateKey })
 const sorted = (a: readonly string[]) => [...a].sort((x, y) => x.localeCompare(y, 'pt-PT'))
 
 describe('trip', () => {
-  test('activeTrip returns today trip, stale one is separate', () => {
+  test('activeTrip returns today trip, one from an earlier day counts as none', () => {
     expect(activeTrip([trip('2026-11-18')], '2026-11-18')?.store).toBe('Lidl')
     expect(activeTrip([trip('2026-11-17')], '2026-11-18')).toBeNull()
-    expect(staleTrip([trip('2026-11-17')], '2026-11-18')?.id).toBe('trip')
-    expect(staleTrip([trip('2026-11-18')], '2026-11-18')).toBeNull()
     expect(activeTrip([], '2026-11-18')).toBeNull()
-    expect(staleTrip([{ id: 'stores' }], '2026-11-18')).toBeNull()
   })
   test('customStores', () => {
     expect(customStores([{ id: 'stores', custom: ['Talho Zé'] } as never])).toEqual(['Talho Zé'])

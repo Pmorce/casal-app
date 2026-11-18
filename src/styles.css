@@ -260,6 +260,7 @@ h2 { font-size: 16px; font-weight: 800; margin: 18px 0 8px; }
 /* Compras: zone subtitles carry an icon and a count; the add field floats over the header with a square + inside */
 .zone-title h3 { margin: 0; font: inherit; letter-spacing: inherit; }
 .zone-count { margin-left: auto; padding: 1px 8px; border-radius: 99px; background: var(--accent-soft); color: var(--accent-ink); letter-spacing: 0; }
+.zone-count svg { display: block; width: 12px; height: 12px; margin: 2px 0; stroke-width: 2.8; }
 .zone-picker { margin: 6px 0 4px; }
 .add-bar { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; padding: 4px 4px 4px 2px; border-radius: 18px; border: 1.5px solid transparent; background: var(--card); box-shadow: var(--shadow); transition: border-color .15s; }
 .add-bar:focus-within { border-color: var(--accent); }

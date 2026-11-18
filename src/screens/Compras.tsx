@@ -11,7 +11,8 @@ import { shownGap } from '../domain/rhythm'
 import { unlinkOrphans } from '../domain/freezer'
 import { backToCasa, needsStoreQuestion, planFinish } from '../domain/finish'
 import { meatProductOf, partsLine } from '../domain/meat'
-import { activeTrip, customStores, staleTrip, storeOptions } from '../domain/stores'
+import { activeTrip, customStores, storeOptions } from '../domain/stores'
+import { addDays } from '../domain/dates'
 import { GROUP_LABEL, groupByZone, guessZone, ZONES } from '../domain/zones'
 import type { FreezerBag, Product, Purchase, ShoppingItem, Zone } from '../domain/types'
 import UndoToast from '../components/UndoToast'
@@ -46,7 +47,8 @@ export default function Compras() {
   const products = useCollection<Product>('products')
   const bags = useCollection<FreezerBag>('freezerBags')
   const meta = useCollection<{ id: string }>('meta')
-  const purchases = useCollection<Purchase>('purchases')
+  // only to rank the stores: the last year is enough, and the listener stays bounded (a string, so the query key is stable)
+  const purchases = useCollection<Purchase>('purchases', ['dateKey', '>=', addDays(today, -365)])
   const [text, setText] = useState('')
   const [msg, setMsg] = useState('')
   // a new name waits here for its zone (pre-selected guess) before anything is written
@@ -63,9 +65,8 @@ export default function Compras() {
   // the shared trip: a store picker is open to start it or to change store
   const trip = activeTrip(meta, today)
   const [picking, setPicking] = useState<'start' | 'change' | null>(null)
-  const stale = staleTrip(meta, today) !== null
-  // a trip left from an earlier day is cleared quietly; braces matter (see SpentForm)
-  useEffect(() => { if (stale) leaveTrip() }, [stale])
+  // a trip from an earlier day is never deleted here: the offline cache may still hold it while the other phone
+  // has started today's; activeTrip ignores it and the next startTrip overwrites it
   // the meat card open under its row (one at a time)
   const [meatOpen, setMeatOpen] = useState<string | null>(null)
 
@@ -97,7 +98,7 @@ export default function Compras() {
     setUndo({ message: `«${i.text}» apagado`, run: () => restore('shopping', [i]) })
   }
 
-  // one "Onde foi?" on screen at a time: the trip's picker closes the one asked by "Terminar", and the reverse
+  // one store picker on screen at a time: the trip's "Em que loja estás?" closes the "Onde foi?" of "Terminar", and the reverse
   function openPicker(kind: 'start' | 'change') {
     setAskingStore(false)
     setPicking(kind)
@@ -170,7 +171,7 @@ export default function Compras() {
       <div className="lift">
         <TripBar trip={trip} cartCount={cart.length} onStart={() => openPicker('start')} onChange={() => openPicker('change')} onLeave={leave} />
         {picking && (
-          <StorePicker title="Onde foi?" options={storeOptions(customStores(meta), purchases)}
+          <StorePicker title="Em que loja estás?" options={storeOptions(customStores(meta), purchases)}
             onCancel={() => setPicking(null)}
             onAddCustom={name => addCustomStore(name, customStores(meta))}
             onPick={store => {
@@ -196,15 +197,22 @@ export default function Compras() {
 
         <div className="card">
           <h2 className="card-title">Por comprar <span className="pill">{todoCount}</span></h2>
-          {!todoCount && <p className="muted small">Nada por comprar</p>}
-          {groups.map(g => (
-            <div key={g.group}>
-              <div className="zone-title">
-                <Icon name={GROUP_ICON[g.group]} /><h3>{GROUP_LABEL[g.group]}</h3><span className="zone-count">{g.items.filter(i => i.status === 'porComprar').length}</span>
+          {!items.length && <p className="muted small">Nada por comprar</p>}
+          {!todoCount && cart.length > 0 && <p className="muted small">Tudo no carrinho</p>}
+          {groups.map(g => {
+            const left = g.items.filter(i => i.status === 'porComprar').length
+            return (
+              <div key={g.group}>
+                <div className="zone-title">
+                  <Icon name={GROUP_ICON[g.group]} /><h3>{GROUP_LABEL[g.group]}</h3>
+                  {left
+                    ? <span className="zone-count">{left}</span>
+                    : <span className="zone-count" role="img" aria-label={`${GROUP_LABEL[g.group]}: tudo no carrinho`}><Icon name="check" /></span>}
+                </div>
+                {g.items.map(i => row(i, g.group === 'semZona' && i.status === 'porComprar'))}
               </div>
-              {g.items.map(i => row(i, g.group === 'semZona' && i.status === 'porComprar'))}
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         {missing.length > 0 && (
