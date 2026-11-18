@@ -8,7 +8,8 @@ import { undoFreeze, type FrozenBatch } from '../data/freezerRepo'
 import { addCustomStore, changeStore, leaveTrip, restoreTrip, startTrip } from '../data/tripRepo'
 import { backToCasa, maybeMissing } from '../domain/shopping'
 import { shownGap } from '../domain/rhythm'
-import { freezerInCart, unlinkOrphans } from '../domain/freezer'
+import { unlinkOrphans } from '../domain/freezer'
+import { needsStoreQuestion, planFinish } from '../domain/finish'
 import { meatProductOf, partsLine } from '../domain/meat'
 import { activeTrip, customStores, staleTrip, storeOptions } from '../domain/stores'
 import { GROUP_LABEL, groupByZone, guessZone, ZONES } from '../domain/zones'
@@ -52,9 +53,11 @@ export default function Compras() {
   const [guess, setGuess] = useState<Zone | null>(null)
   const [undo, setUndo] = useState<{ message: string; run: () => void } | null>(null)
   const closeUndo = useCallback(() => setUndo(null), [])
-  // after "Terminar compras": first what went to the freezer, then how much it was (one card at a time)
+  // after "Terminar compras": first what went to the freezer, then how much it was, one card per store (null: no store)
   const [freezing, setFreezing] = useState<Product[] | null>(null)
-  const [askSpent, setAskSpent] = useState(false)
+  const [spentQueue, setSpentQueue] = useState<(string | null)[]>([])
+  // "Terminar" without a trip and with ticks of no store asks "Onde foi?" first
+  const [askingStore, setAskingStore] = useState(false)
   // bags saved from the freezer card; a ref so the undo created before them still sees them
   const savedBags = useRef<FrozenBatch[]>([])
   // the shared trip: a store picker is open to start it or to change store
@@ -92,6 +95,12 @@ export default function Compras() {
     setUndo({ message: `«${i.text}» apagado`, run: () => restore('shopping', [i]) })
   }
 
+  // one "Onde foi?" on screen at a time: the trip's picker closes the one asked by "Terminar", and the reverse
+  function openPicker(kind: 'start' | 'change') {
+    setAskingStore(false)
+    setPicking(kind)
+  }
+
   function leave() {
     if (!trip) return
     leaveTrip()
@@ -99,18 +108,28 @@ export default function Compras() {
   }
 
   function terminate() {
-    const toFreeze = freezerInCart(items, products)
-    const done = finish(items, products, today)
+    setPicking(null)
+    if (needsStoreQuestion(items, trip)) setAskingStore(true)
+    else finishWith(null)
+  }
+
+  function finishWith(asked: string | null) {
+    setAskingStore(false)
+    const plan = planFinish(items, products, { trip, asked, uid, today })
+    // until the freezer card takes the plan's rows (pre-filled parts), it gets their products, once each
+    const ids = new Set(plan.freezer.map(f => f.productId))
+    const toFreeze = products.filter(p => ids.has(p.id)).sort((a, b) => a.name.localeCompare(b.name, 'pt-PT'))
+    const done = finish(items, products, plan, today, trip)
     savedBags.current = []
     // a second "Terminar" with the card still open adds to it (what was typed stays)
     setFreezing(open => {
       const all = [...(open ?? []), ...toFreeze.filter(p => !open?.some(o => o.id === p.id))]
       return all.length ? all : null
     })
-    setAskSpent(true)
+    setSpentQueue(q => [...q, ...plan.stores.filter(s => !q.includes(s))])
     setUndo({
       message: 'Compras terminadas',
-      run: () => { undoFinish(done); savedBags.current.forEach(b => undoFreeze(b)); setFreezing(null); setAskSpent(false) },
+      run: () => { undoFinish(done); savedBags.current.forEach(b => undoFreeze(b)); setFreezing(null); setSpentQueue([]) },
     })
   }
 
@@ -143,7 +162,7 @@ export default function Compras() {
     <>
       <PageHeader title="Compras" sub={`${todoCount} por comprar · ${cart.length} no carrinho`} />
       <div className="lift">
-        <TripBar trip={trip} cartCount={cart.length} onStart={() => setPicking('start')} onChange={() => setPicking('change')} onLeave={leave} />
+        <TripBar trip={trip} cartCount={cart.length} onStart={() => openPicker('start')} onChange={() => openPicker('change')} onLeave={leave} />
         {picking && (
           <StorePicker title="Onde foi?" options={storeOptions(customStores(meta), purchases)}
             onCancel={() => setPicking(null)}
@@ -205,9 +224,20 @@ export default function Compras() {
           <FreezeForm products={freezing} today={today}
             onSaved={batch => { savedBags.current = [...savedBags.current, batch] }} onDone={() => setFreezing(null)} />
         )}
-        {askSpent && !freezing && <SpentForm title="Compras terminadas. Quanto foi?" today={today} onDone={() => setAskSpent(false)} />}
+        {spentQueue.length > 0 && !freezing && (
+          // keyed by store: each card starts empty, nothing typed for one store carries to the next
+          <SpentForm key={`loja:${spentQueue[0] ?? ''}`} today={today} store={spentQueue[0] ?? undefined}
+            title={spentQueue[0] ? `${spentQueue[0]} — quanto foi?` : 'Compras terminadas. Quanto foi?'}
+            onDone={() => setSpentQueue(q => q.slice(1))} />
+        )}
 
-        {cart.length > 0 && (
+        {askingStore && (
+          <StorePicker title="Onde foi?" allowNone options={storeOptions(customStores(meta), purchases)}
+            onCancel={() => setAskingStore(false)}
+            onAddCustom={name => addCustomStore(name, customStores(meta))}
+            onPick={finishWith} />
+        )}
+        {cart.length > 0 && !askingStore && (
           <>
             <button className="btn primary block" onClick={terminate}><Icon name="check" />Terminar compras ({cart.length})</button>
             <p className="small muted" style={{ textAlign: 'center' }}>

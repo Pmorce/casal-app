@@ -5,8 +5,8 @@ import { parseEuros } from '../domain/expenses'
 import { Badge } from './Icon'
 import type { DateKey } from '../domain/dates'
 
-/** "Quanto foi?" straight into Gastos; scrolls itself into view so it is never off-screen. */
-export default function SpentForm({ title, today, onDone }: { title: string; today: DateKey; onDone: () => void }) {
+/** "Quanto foi?" straight into Gastos (with the store, when the card is for one); scrolls itself into view so it is never off-screen. */
+export default function SpentForm({ title, today, store, onDone }: { title: string; today: DateKey; store?: string; onDone: () => void }) {
   const { uid, members } = useSession()
   const [spent, setSpent] = useState('')
   const [who, setWho] = useState(uid)
@@ -19,7 +19,8 @@ export default function SpentForm({ title, today, onDone }: { title: string; tod
     e.preventDefault()
     const cents = parseEuros(spent)
     if (cents === null) return setError('Valor inválido')
-    addExpense(cents, who, today)
+    if (store) addExpense(cents, who, today, undefined, store)
+    else addExpense(cents, who, today)
     onDone()
   }
 

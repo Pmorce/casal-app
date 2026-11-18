@@ -3,6 +3,8 @@ import {
 } from './shoppingRepo'
 import { bag, item, part, prod } from '../domain/testFactories'
 import { fire } from './write'
+import { planFinish } from '../domain/finish'
+import type { Product, ShoppingItem, Trip } from '../domain/types'
 
 const fs = vi.hoisted(() => ({
   addDoc: vi.fn(async (_ref: unknown, _data: Record<string, unknown>) => ({ id: 'new' })),
@@ -12,6 +14,8 @@ const fs = vi.hoisted(() => ({
 }))
 vi.mock('./firebase', () => ({ db: {} }))
 vi.mock('./write', () => ({ fire: vi.fn() }))
+const trips = vi.hoisted(() => ({ restoreTrip: vi.fn() }))
+vi.mock('./tripRepo', () => trips)
 vi.mock('firebase/firestore', async () => ({
   collection: vi.fn(() => 'shoppingRef'),
   doc: vi.fn((...args: unknown[]) => ({ id: String(args[2] ?? 'newId'), path: args.slice(1).join('/') })),
@@ -65,14 +69,45 @@ test('"só desta vez" adds an item with no product', () => {
   expect(data.productId).toBeUndefined()
 })
 
+const finishWith = (items: ShoppingItem[], products: Product[], trip: Trip | null = null) =>
+  finish(items, products, planFinish(items, products, { trip, asked: null, uid: 'P', today: '2026-10-29' }), '2026-10-29', trip)
+
 test('finish records today as a purchase and skips deleted products', () => {
-  finish([item({ id: 'i1', status: 'carrinho', productId: 'p1' }), item({ id: 'i2', status: 'carrinho', productId: 'gone' })],
-    [prod({ id: 'p1', boughtKeys: ['2026-10-01'], snoozeCount: 2 })], '2026-10-29')
+  finishWith([item({ id: 'i1', status: 'carrinho', productId: 'p1' }), item({ id: 'i2', status: 'carrinho', productId: 'gone' })],
+    [prod({ id: 'p1', boughtKeys: ['2026-10-01'], snoozeCount: 2 })])
   expect(fs.updateDoc).toHaveBeenCalledTimes(1)
   expect(fs.updateDoc).toHaveBeenCalledWith(expect.anything(), { boughtKeys: ['2026-10-01', '2026-10-29'], snoozedUntil: 'DEL', snoozeCount: 'DEL' })
   expect(fs.del).toHaveBeenCalledTimes(2)
   // a product deleted on the other phone must not make the server reject clearing the list
   expect(fs.update).not.toHaveBeenCalled()
+})
+
+const lidl: Trip = { id: 'trip', store: 'Lidl', stores: ['Lidl'], startedBy: 'P', dateKey: '2026-10-29' }
+
+test('finish writes the purchases in the batch with one finishId, deletes the trip, and updates products outside it', () => {
+  const carne = prod({ id: 'carne', name: 'Carne', location: 'congelador', freezerCategory: 'carne' })
+  const vaca = prod({ id: 'vaca', name: 'Vaca', location: 'congelador', freezerCategory: 'carne' })
+  const items = [item({ id: 'i1', productId: 'carne', status: 'carrinho', parts: [part({ id: 'pa', productId: 'vaca', name: 'Vaca', amount: 2, unit: 'kg' })] })]
+  const done = finishWith(items, [carne, vaca], lidl)
+  // the only docs the batch creates are the purchases
+  expect(fs.set.mock.calls).toEqual([[expect.anything(), {
+    name: 'Vaca', productId: 'vaca', store: 'Lidl', dateKey: '2026-10-29', by: 'P', amount: 2, unit: 'kg', finishId: done.finishId, createdAt: 'now',
+  }]])
+  expect(done.finishId).toBeTruthy()
+  expect(done.purchaseIds).toEqual({ pa: 'newId' })
+  expect(fs.del).toHaveBeenCalledWith(expect.objectContaining({ path: 'shopping/i1' }))
+  expect(fs.del).toHaveBeenCalledWith(expect.objectContaining({ path: 'meta/trip' }))
+  expect(fs.commit).toHaveBeenCalledTimes(1)
+  expect(fs.update).not.toHaveBeenCalled()
+  expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'products/vaca' }), expect.objectContaining({ boughtKeys: ['2026-10-29'] }))
+  expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'products/carne' }), { generic: true })
+  expect(done.generic).toEqual(['carne'])
+  expect(done.trip).toBe(lidl)
+})
+
+test('finish without a trip does not touch meta/trip', () => {
+  finishWith([item({ status: 'carrinho' })], [])
+  expect(fs.del).not.toHaveBeenCalledWith(expect.objectContaining({ path: 'meta/trip' }))
 })
 
 test('boughtOutside records the purchase and takes the pending item off the list', () => {
@@ -83,12 +118,22 @@ test('boughtOutside records the purchase and takes the pending item off the list
 })
 
 test('undoFinish puts the items back and deletes rhythm fields that did not exist before', () => {
-  const done = finish([item({ id: 'i1', status: 'carrinho', productId: 'p1', text: 'Café' })],
-    [prod({ id: 'p1', boughtKeys: ['2026-10-01'] })], '2026-10-29')
+  const done = finishWith([item({ id: 'i1', status: 'carrinho', productId: 'p1', text: 'Café' })],
+    [prod({ id: 'p1', boughtKeys: ['2026-10-01'] })])
   vi.clearAllMocks()
   undoFinish(done)
   expect(fs.set).toHaveBeenCalledWith(expect.objectContaining({ id: 'i1' }), expect.objectContaining({ text: 'Café', productId: 'p1' }))
   expect(fs.updateDoc).toHaveBeenCalledWith(expect.anything(), { boughtKeys: ['2026-10-01'], snoozedUntil: 'DEL', snoozeCount: 'DEL' })
+  expect(trips.restoreTrip).not.toHaveBeenCalled()
+})
+
+test('undoFinish deletes the purchases, clears generic and brings the trip back', () => {
+  const done = { items: [], products: [], finishId: 'f', purchaseIds: { a: 'pu1', b: 'pu2' }, generic: ['carne'], trip: lidl }
+  undoFinish(done)
+  expect(fs.del).toHaveBeenCalledWith(expect.objectContaining({ path: 'purchases/pu1' }))
+  expect(fs.del).toHaveBeenCalledWith(expect.objectContaining({ path: 'purchases/pu2' }))
+  expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'products/carne' }), { generic: 'DEL' })
+  expect(trips.restoreTrip).toHaveBeenCalledWith(lidl)
 })
 
 test('setFreezerCategory updates only that field', () => {

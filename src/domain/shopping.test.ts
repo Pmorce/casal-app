@@ -1,4 +1,4 @@
-import { normalize, isOnList, cleanText, findProduct, finishShopping, backToCasa, maybeMissing } from './shopping'
+import { normalize, isOnList, cleanText, findProduct, backToCasa, maybeMissing } from './shopping'
 import { bag, item, prod } from './testFactories'
 
 test('normalize strips accents, case and extra spaces', () => {
@@ -19,19 +19,6 @@ test('cleanText rejects blank input and collapses spaces', () => {
 test('findProduct matches only exact normalized names', () => {
   expect(findProduct('LEITE', [prod({ name: 'Leite' })])?.name).toBe('Leite')
   expect(findProduct('Natas sem lactose ×2', [prod({ name: 'Natas sem lactose' })])).toBeUndefined()
-})
-
-test('finishShopping removes cart items and restores linked products only', () => {
-  expect(finishShopping([
-    item({ id: 'a', status: 'carrinho', productId: 'p1' }),
-    item({ id: 'b', status: 'carrinho' }),
-    item({ id: 'c', status: 'porComprar', productId: 'p2' }),
-  ], [prod({ id: 'p1' }), prod({ id: 'p2' })])).toEqual({ deleteIds: ['a', 'b'], productIdsBought: ['p1'] })
-})
-
-test('finishShopping skips products that no longer exist', () => {
-  expect(finishShopping([item({ id: 'a', status: 'carrinho', productId: 'gone' }), item({ id: 'b', status: 'carrinho', productId: 'p1' })], [prod({ id: 'p1' })]))
-    .toEqual({ deleteIds: ['a', 'b'], productIdsBought: ['p1'] })
 })
 
 test('backToCasa names only cart items linked to a product that still exists', () => {

@@ -85,7 +85,7 @@ export default function Gastos() {
           <div className="card">
             {list.map(e => (
               <div className="row small" key={e.id}>
-                <span className="grow">{e.dateKey.slice(8)}/{e.dateKey.slice(5, 7)} · {members[e.uid] ?? '?'}{e.note ? ` · ${e.note}` : ''}</span>
+                <span className="grow">{e.dateKey.slice(8)}/{e.dateKey.slice(5, 7)} · {members[e.uid] ?? '?'}{e.store ? ` · ${e.store}` : ''}{e.note ? ` · ${e.note}` : ''}</span>
                 <span>{formatEuros(e.cents)}</span>
                 <button className="x-btn" aria-label="Apagar registo" onClick={() => { deleteExpense(e.id); setUndo(e) }}><Icon name="x" /></button>
               </div>

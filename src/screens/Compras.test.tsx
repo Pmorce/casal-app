@@ -29,6 +29,12 @@ vi.mock('../data/freezerRepo', () => freezer)
 
 const renderIt = () => render(<MemoryRouter><Compras /></MemoryRouter>)
 beforeEach(() => { vi.clearAllMocks(); data.products = []; data.bags = []; data.meta = []; freezer.freezeBought.mockReturnValue(frozen) })
+/** "Terminar compras"; with untagged ticks and no trip it first asks "Onde foi?", answered with "Não digo". */
+function terminar() {
+  fireEvent.click(screen.getByRole('button', { name: /Terminar compras/ }))
+  const none = screen.queryByRole('button', { name: 'Não digo' })
+  if (none) fireEvent.click(none)
+}
 
 test('"Terminar compras" only appears with something in the cart', () => {
   data.shopping = [item({ text: 'Café', status: 'porComprar' })]
@@ -140,7 +146,7 @@ test('the note says nothing changes in Casa when no cart item is a Casa product'
 test('finishing asks how much it was and records it in Gastos', () => {
   data.shopping = [item({ text: 'Café', status: 'carrinho' })]
   renderIt()
-  fireEvent.click(screen.getByRole('button', { name: /Terminar compras/ }))
+  terminar()
   fireEvent.change(screen.getByPlaceholderText(/47,30/), { target: { value: '47,30' } })
   fireEvent.click(screen.getByRole('button', { name: 'Registar' }))
   expect(exp.addExpense).toHaveBeenCalledWith(4730, 'P', '2026-10-29')
@@ -150,7 +156,7 @@ test('finishing asks how much it was and records it in Gastos', () => {
 test('the "how much" question appears where the cart was, not at the top of the screen', () => {
   data.shopping = [item({ text: 'Ovos', status: 'porComprar', oneOff: true }), item({ text: 'Café', status: 'carrinho' })]
   renderIt()
-  fireEvent.click(screen.getByRole('button', { name: /Terminar compras/ }))
+  terminar()
   const question = screen.getByText(/Quanto foi/)
   const list = screen.getByText('Por comprar')
   expect(list.compareDocumentPosition(question) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
@@ -164,7 +170,7 @@ const freezerCart = () => {
 test('finishing with Congelador products asks what went to the freezer, then how much it was', () => {
   freezerCart()
   renderIt()
-  fireEvent.click(screen.getByRole('button', { name: /Terminar compras/ }))
+  terminar()
   expect(screen.getByText(/Para o congelador/)).toBeTruthy()
   expect(screen.queryByText(/Quanto foi/)).toBeNull()
   fireEvent.change(screen.getByLabelText('Quantidade de Carne de vaca'), { target: { value: '5' } })
@@ -177,7 +183,7 @@ test('finishing with Congelador products asks what went to the freezer, then how
 test('finishing without Congelador products goes straight to "Quanto foi?"', () => {
   data.shopping = [item({ text: 'Café', status: 'carrinho' })]
   renderIt()
-  fireEvent.click(screen.getByRole('button', { name: /Terminar compras/ }))
+  terminar()
   expect(screen.queryByText(/Para o congelador/)).toBeNull()
   expect(screen.getByText(/Quanto foi/)).toBeTruthy()
 })
@@ -185,7 +191,7 @@ test('finishing without Congelador products goes straight to "Quanto foi?"', () 
 test('Desfazer after saving the freezer card also deletes the new bags', () => {
   freezerCart()
   renderIt()
-  fireEvent.click(screen.getByRole('button', { name: /Terminar compras/ }))
+  terminar()
   fireEvent.change(screen.getByLabelText('Quantidade de Carne de vaca'), { target: { value: '5' } })
   fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
   fireEvent.click(screen.getByRole('button', { name: 'Desfazer' }))
@@ -204,12 +210,12 @@ test('a Congelador product without bags shows in Talvez falte as "não há no co
 test('finishing again with the freezer card open adds the new products to it, keeping what was typed', () => {
   freezerCart()
   const { rerender } = renderIt()
-  fireEvent.click(screen.getByRole('button', { name: /Terminar compras/ }))
+  terminar()
   fireEvent.change(screen.getByLabelText('Quantidade de Carne de vaca'), { target: { value: '5' } })
   data.products = [...data.products, prod({ id: 'g', name: 'Gelado', location: 'congelador' })]
   data.shopping = [item({ text: 'Gelado', status: 'carrinho', productId: 'g' })]
   rerender(<MemoryRouter><Compras /></MemoryRouter>)
-  fireEvent.click(screen.getByRole('button', { name: /Terminar compras/ }))
+  terminar()
   expect((screen.getByLabelText('Quantidade de Carne de vaca') as HTMLInputElement).value).toBe('5')
   expect(screen.getByLabelText('Quantidade de Gelado')).toBeTruthy()
 })
@@ -309,4 +315,45 @@ test('a ticked meat item says what is already in the cart', () => {
   ] })]
   renderIt()
   expect(screen.getByText('Já levas: 3 kg Vaca · 1 kg Vazia')).toBeTruthy()
+})
+
+test('finishing a trip with two stores asks "quanto foi?" for each, in trip order, with the store', () => {
+  data.meta = [{ ...lidl, store: 'Continente', stores: ['Lidl', 'Continente'] } as Trip]
+  data.shopping = [item({ text: 'Leite', status: 'carrinho', store: 'Continente' }), item({ text: 'Café', status: 'carrinho', store: 'Lidl' })]
+  renderIt()
+  fireEvent.click(screen.getByRole('button', { name: /Terminar compras/ }))
+  expect(screen.queryByText('Onde foi?')).toBeNull()
+  expect(repo.finish).toHaveBeenCalledWith(data.shopping, [], expect.objectContaining({ stores: ['Lidl', 'Continente'] }), '2026-10-29',
+    expect.objectContaining({ store: 'Continente' }))
+  expect(screen.getByRole('heading', { name: 'Lidl — quanto foi?' })).toBeTruthy()
+  fireEvent.change(screen.getByPlaceholderText(/47,30/), { target: { value: '12' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Registar' }))
+  expect(exp.addExpense).toHaveBeenCalledWith(1200, 'P', '2026-10-29', undefined, 'Lidl')
+  expect(screen.getByRole('heading', { name: 'Continente — quanto foi?' })).toBeTruthy()
+  // a fresh form for the next store: nothing typed carries over
+  expect((screen.getByPlaceholderText(/47,30/) as HTMLInputElement).value).toBe('')
+  fireEvent.click(screen.getByRole('button', { name: 'Agora não' }))
+  expect(screen.queryByText(/quanto foi/i)).toBeNull()
+})
+
+test('finishing without a trip asks "Onde foi?" and the answer names the store of the purchases and the expense', () => {
+  data.shopping = [item({ text: 'Café', status: 'carrinho' })]
+  renderIt()
+  fireEvent.click(screen.getByRole('button', { name: /Terminar compras/ }))
+  expect(repo.finish).not.toHaveBeenCalled()
+  expect(screen.getByRole('heading', { name: 'Onde foi?' })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Aldi' }))
+  const plan = (repo.finish.mock.calls[0] as unknown[])[2] as { purchases: { row: { store?: string } }[] }
+  expect(plan.purchases[0].row.store).toBe('Aldi')
+  expect(screen.queryByText('Onde foi?')).toBeNull()
+  expect(screen.getByRole('heading', { name: 'Aldi — quanto foi?' })).toBeTruthy()
+})
+
+test('"Cancelar" on "Onde foi?" does not finish', () => {
+  data.shopping = [item({ text: 'Café', status: 'carrinho' })]
+  renderIt()
+  fireEvent.click(screen.getByRole('button', { name: /Terminar compras/ }))
+  fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+  expect(screen.queryByText('Onde foi?')).toBeNull()
+  expect(repo.finish).not.toHaveBeenCalled()
 })

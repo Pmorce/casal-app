@@ -1,7 +1,7 @@
 import { daysBetween, type DateKey } from './dates'
 import { normalize } from './shopping'
 import { freezerCategoryOf } from './zones'
-import type { FreezerBag, FreezerCategory, FreezerUnit, Product, ShoppingItem } from './types'
+import type { FreezerBag, FreezerCategory, FreezerUnit, Product } from './types'
 
 export interface FreezerGroup {
   key: string
@@ -115,10 +115,4 @@ export const maxSplit = (total: number): number => Math.min(20, Math.round(total
 export function freezeDefaults(p: Product): { amount: string; unit: FreezerUnit } {
   if (p.freezerLast) return { amount: formatAmount(p.freezerLast.amount), unit: p.freezerLast.unit }
   return { amount: '', unit: freezerCategoryOf(p) === 'carne' ? 'kg' : 'un' }
-}
-
-/** Congelador products in the cart, once each: what "Terminar compras" offers to put in the freezer. */
-export function freezerInCart(items: ShoppingItem[], products: Product[]): Product[] {
-  const ids = new Set(items.filter(i => i.status === 'carrinho' && i.productId).map(i => i.productId))
-  return products.filter(p => p.location === 'congelador' && ids.has(p.id)).sort((a, b) => a.name.localeCompare(b.name, 'pt-PT'))
 }

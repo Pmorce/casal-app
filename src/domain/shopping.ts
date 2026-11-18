@@ -21,16 +21,6 @@ export function isOnList(text: string, items: ShoppingItem[]): boolean {
   return items.some(i => normalize(i.text) === key)
 }
 
-/** Products deleted meanwhile are skipped: updating a missing doc would make the server reject the whole batch. */
-export function finishShopping(items: ShoppingItem[], products: Product[]): { deleteIds: string[]; productIdsBought: string[] } {
-  const existing = new Set(products.map(p => p.id))
-  const inCart = items.filter(i => i.status === 'carrinho')
-  return {
-    deleteIds: inCart.map(i => i.id),
-    productIdsBought: inCart.flatMap(i => (i.productId && existing.has(i.productId) ? [i.productId] : [])),
-  }
-}
-
 /** Names whose purchase "Terminar compras" will really record in Casa — the note must not promise more. */
 export function backToCasa(items: ShoppingItem[], products: Product[]): string[] {
   const existing = new Set(products.map(p => p.id))

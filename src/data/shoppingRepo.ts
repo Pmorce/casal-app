@@ -1,11 +1,13 @@
 import { addDoc, collection, deleteDoc, deleteField, doc, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore'
 import { db } from './firebase'
 import { fire } from './write'
-import { cleanText, findProduct, finishShopping, isOnList, normalize } from '../domain/shopping'
+import { cleanText, findProduct, isOnList, normalize } from '../domain/shopping'
+import { restoreTrip } from './tripRepo'
+import type { FinishPlan } from '../domain/finish'
 import { itemsOfProduct } from '../domain/pantry'
 import { recordPurchase, snoozeUntil } from '../domain/rhythm'
 import type { DateKey } from '../domain/dates'
-import type { FreezerBag, Part, Product, ShoppingItem, Zone } from '../domain/types'
+import type { FreezerBag, Part, Product, ShoppingItem, Trip, Zone } from '../domain/types'
 
 /**
  * A known product name goes straight on the list. A new name returns 'needsZone' without writing:
@@ -128,24 +130,54 @@ export interface FinishedShopping {
   items: ShoppingItem[]
   /** bought products, with their rhythm fields as they were before */
   products: RhythmFields[]
+  /** groups the purchases of this "Terminar" */
+  finishId: string
+  /** purchase key (part or item id) → purchase doc id */
+  purchaseIds: Record<string, string>
+  /** products this "Terminar" made generic */
+  generic: string[]
+  /** the trip it ended, to bring back on undo */
+  trip: Trip | null
 }
 
-/** "Terminar compras": drop everything in the cart and record today's purchase of each linked product. Returns what undo needs. */
-export function finish(items: ShoppingItem[], products: Product[], today: DateKey): FinishedShopping {
-  const { deleteIds, productIdsBought } = finishShopping(items, products)
-  const bought = products.filter(p => productIdsBought.includes(p.id))
+/**
+ * "Terminar compras": one batch drops the cart, writes the purchases and ends the trip; then each bought product
+ * records today and each "Carne" that only held other types turns generic. Returns what undo needs.
+ */
+export function finish(items: ShoppingItem[], products: Product[], plan: FinishPlan, today: DateKey, trip: Trip | null): FinishedShopping {
+  const bought = products.filter(p => plan.boughtIds.includes(p.id))
+  const generic = plan.makeGeneric.filter(id => products.some(p => p.id === id))
+  const finishId = doc(collection(db, 'purchases')).id
+  const purchaseIds: Record<string, string> = {}
   const batch = writeBatch(db)
-  deleteIds.forEach(id => batch.delete(doc(db, 'shopping', id)))
+  plan.deleteIds.forEach(id => batch.delete(doc(db, 'shopping', id)))
+  for (const { key, row } of plan.purchases) {
+    const ref = doc(collection(db, 'purchases'))
+    purchaseIds[key] = ref.id
+    batch.set(ref, { ...row, finishId, createdAt: serverTimestamp() })
+  }
+  if (trip) batch.delete(doc(db, 'meta', 'trip'))
   fire(batch.commit())
   bought.forEach(p => updateProduct(p.id, purchased(p, today)))
-  return { items: items.filter(i => deleteIds.includes(i.id)), products: bought.map(rhythmFields) }
+  generic.forEach(id => updateProduct(id, { generic: true }))
+  return {
+    items: items.filter(i => plan.deleteIds.includes(i.id)),
+    products: bought.map(rhythmFields),
+    finishId,
+    purchaseIds,
+    generic,
+    trip,
+  }
 }
 
 export function undoFinish(done: FinishedShopping): void {
   const batch = writeBatch(db)
   for (const { id, ...data } of done.items) batch.set(doc(db, 'shopping', id), data)
+  Object.values(done.purchaseIds).forEach(id => batch.delete(doc(db, 'purchases', id)))
   fire(batch.commit())
   done.products.forEach(p => updateProduct(p.id, restoreRhythm(p)))
+  done.generic.forEach(id => updateProduct(id, { generic: deleteField() }))
+  if (done.trip) restoreTrip(done.trip)
 }
 
 export interface BoughtSnapshot {

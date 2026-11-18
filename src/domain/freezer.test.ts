@@ -1,4 +1,4 @@
-import { parseAmount, summary, groupBags, oldestBag, isOld, bagsOfProduct, splitAmounts, freezeDefaults, freezerInCart, unlinkOrphans, maxSplit } from './freezer'
+import { parseAmount, summary, groupBags, oldestBag, isOld, bagsOfProduct, splitAmounts, freezeDefaults, unlinkOrphans, maxSplit } from './freezer'
 import { bag, item, prod } from './testFactories'
 
 const group = (bags: ReturnType<typeof bag>[]) => groupBags(bags)[0]
@@ -61,12 +61,6 @@ test('freezeDefaults uses the last entry, else kg for meat and un. for the rest'
   expect(freezeDefaults(prod({ name: 'Vaca', location: 'congelador', freezerLast: { amount: 2.5, unit: 'kg' } }))).toEqual({ amount: '2,5', unit: 'kg' })
   expect(freezeDefaults(prod({ name: 'Vaca', location: 'congelador' }))).toEqual({ amount: '', unit: 'kg' })
   expect(freezeDefaults(prod({ name: 'Gelado', location: 'congelador' }))).toEqual({ amount: '', unit: 'un' })
-})
-
-test('freezerInCart lists Congelador products in the cart, once', () => {
-  const products = [prod({ id: 'c', location: 'congelador' }), prod({ id: 'd', location: 'despensa' })]
-  const items = [item({ status: 'carrinho', productId: 'c' }), item({ status: 'carrinho', productId: 'd' }), item({ status: 'porComprar', productId: 'c' }), item({ status: 'carrinho', productId: 'c' })]
-  expect(freezerInCart(items, products).map(p => p.id)).toEqual(['c'])
 })
 
 test('freezeDefaults writes big amounts without a thousands space (else the card rejects its own prefill)', () => {
