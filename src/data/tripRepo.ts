@@ -1,4 +1,4 @@
-import { deleteDoc, doc, serverTimestamp, setDoc } from 'firebase/firestore'
+import { arrayUnion, deleteDoc, doc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
 import { db } from './firebase'
 import { fire } from './write'
 import { normalize } from '../domain/shopping'
@@ -15,7 +15,8 @@ export function startTrip(store: string, uid: string, today: DateKey): void {
 /** "Mudar de loja": same trip, new store; `stores` remembers every store visited, without repeats. */
 export function changeStore(trip: Trip, store: string): void {
   const stores = trip.stores.includes(store) ? trip.stores : [...trip.stores, store]
-  fire(setDoc(tripRef(), { store, stores }, { merge: true }))
+  // updateDoc, not set+merge: if the other phone already left, a missing trip must not come back half-empty
+  fire(updateDoc(tripRef(), { store, stores }), { quiet: true })
 }
 
 export const leaveTrip = (): void => fire(deleteDoc(tripRef()))
@@ -29,5 +30,5 @@ export function restoreTrip(trip: Trip): void {
 export function addCustomStore(name: string, custom: string[]): void {
   const clean = name.trim()
   if (!clean || custom.some(s => normalize(s) === normalize(clean))) return
-  fire(setDoc(doc(db, 'meta', 'stores'), { custom: [...custom, clean] }, { merge: true }))
+  fire(setDoc(doc(db, 'meta', 'stores'), { custom: arrayUnion(clean) }, { merge: true }))
 }

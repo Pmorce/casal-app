@@ -130,6 +130,7 @@ export default function Compras() {
         <TripBar trip={trip} cartCount={cart.length} onStart={() => setPicking('start')} onChange={() => setPicking('change')} onLeave={leave} />
         {picking && (
           <StorePicker title="Onde foi?" options={storeOptions(customStores(meta), purchases)}
+            onCancel={() => setPicking(null)}
             onAddCustom={name => addCustomStore(name, customStores(meta))}
             onPick={store => {
               if (store) { if (picking === 'start') startTrip(store, uid, today); else if (trip) changeStore(trip, store) }

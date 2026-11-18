@@ -1,12 +1,13 @@
 import { useState, type FormEvent } from 'react'
 
 /** One tap to say where; "+ outra" adds a store of your own. "Não digo" only where leaving it out makes sense. */
-export default function StorePicker({ title, options, onPick, allowNone, onAddCustom }: {
+export default function StorePicker({ title, options, onPick, allowNone, onAddCustom, onCancel }: {
   title: string
   options: string[]
   onPick: (store: string | null) => void
   allowNone?: boolean
   onAddCustom: (name: string) => void
+  onCancel?: () => void
 }) {
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
@@ -27,6 +28,7 @@ export default function StorePicker({ title, options, onPick, allowNone, onAddCu
         {!adding && <button type="button" onClick={() => setAdding(true)}>+ outra</button>}
         {allowNone && <button type="button" onClick={() => onPick(null)}>Não digo</button>}
       </div>
+      {onCancel && <button type="button" className="btn ghost" onClick={onCancel}>Cancelar</button>}
       {adding && (
         <form className="inline" onSubmit={submit}>
           <input className="input" placeholder="Nome da loja" aria-label="Nome da loja" value={name} autoFocus

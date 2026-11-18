@@ -260,3 +260,11 @@ test('"Sair" leaves the trip and offers undo', () => {
   fireEvent.click(screen.getByRole('button', { name: 'Desfazer' }))
   expect(trips.restoreTrip).toHaveBeenCalledWith(expect.objectContaining({ store: 'Lidl' }))
 })
+
+test('"Cancelar" closes the store picker without writing', () => {
+  renderIt()
+  fireEvent.click(screen.getByRole('button', { name: 'Iniciar compras' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+  expect(screen.queryByText('Onde foi?')).toBeNull()
+  expect(trips.startTrip).not.toHaveBeenCalled()
+})
