@@ -311,6 +311,21 @@ h2 { font-size: 16px; font-weight: 800; margin: 18px 0 8px; }
 .freeze-row { margin-bottom: 12px; }
 .freeze-head { display: flex; align-items: center; gap: 8px; }
 .freeze-head .input { flex: none; width: 96px; }
+/* Casa by place: − número + per counted product; the number is a button ("Quantos há?"), dimmed when it may be stale */
+.stepper.count { gap: 2px; }
+.stepper button.num { width: auto; min-width: 32px; padding: 0 4px; border-radius: 12px; background: none; box-shadow: none; color: var(--text); font-size: 15px; font-weight: 800; }
+.stepper button.num.dim { color: var(--muted); font-weight: 600; }
+.stepper-gap { width: 32px; height: 32px; flex: none; }
+.stepper .chip { width: auto; height: auto; padding: 0 12px; border-radius: 99px; background: var(--accent-soft); color: var(--accent-ink); box-shadow: none; }
+.more-btn { flex: none; width: 44px; height: 44px; margin-right: -8px; border: none; border-radius: 14px; background: none; color: var(--muted); font-size: 20px; font-weight: 800; cursor: pointer; display: grid; place-items: center; }
+.row-menu { display: flex; justify-content: flex-end; gap: 8px; padding: 2px 8px 6px; }
+.qty-form { margin: 2px 8px 8px; padding: 10px 12px; border-radius: 16px; background: var(--wash); }
+.qty-form .input { background: var(--card); }
+.qty-label { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 700; }
+.qty-label .input { flex: none; width: 96px; }
+.freezer-link { display: flex; align-items: center; gap: 10px; min-height: 44px; color: inherit; text-decoration: none; font-weight: 800; }
+.switch { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; }
+.switch input { width: 20px; height: 20px; margin: 0; accent-color: var(--accent-strong); cursor: pointer; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0s !important; animation-duration: 0s !important; scroll-behavior: auto !important; }

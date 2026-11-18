@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import Casa from './Casa'
 import { bag, item, prod } from '../domain/testFactories'
@@ -20,10 +20,16 @@ vi.mock('../data/shoppingRepo', () => repo)
 vi.mock('../data/restore', () => ({ restore: vi.fn() }))
 const exp = vi.hoisted(() => ({ addExpense: vi.fn() }))
 vi.mock('../data/expensesRepo', () => exp)
-vi.mock('../data/freezerRepo', () => ({ freezeBought: vi.fn(() => []) }))
+const stock = vi.hoisted(() => ({ changeCount: vi.fn(), setCount: vi.fn(), setUncounted: vi.fn(), setLastQty: vi.fn(), setPurchaseQty: vi.fn() }))
+vi.mock('../data/stockRepo', () => stock)
 
-const renderIt = () => render(<MemoryRouter><Casa /></MemoryRouter>)
-beforeEach(() => { vi.clearAllMocks(); data.products = []; data.shopping = []; data.bags = [] })
+/** Opens Casa on a place tab (products default to Despensa). */
+const renderIt = (tab = 'Despensa') => {
+  const r = render(<MemoryRouter><Casa /></MemoryRouter>)
+  fireEvent.click(screen.getByRole('tab', { name: tab }))
+  return r
+}
+beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); data.products = []; data.shopping = []; data.bags = [] })
 
 test('each product shows its rhythm and has Falta and Comprei', () => {
   data.products = [prod({ id: 'c', name: 'Café', boughtKeys: ['2026-10-09', '2026-10-19'] })]
@@ -53,7 +59,7 @@ test('Falta row: Comprei is the only, main action', () => {
 
 test('Talvez falte row: Falta is the main action, Ainda há is quieter', () => {
   data.products = [prod({ id: 'd', name: 'Detergente', location: 'limpeza', boughtKeys: ['2026-09-01', '2026-09-11', '2026-09-21'] })]
-  renderIt()
+  renderIt('Limpeza')
   expect(screen.getByRole('button', { name: 'Falta Detergente' }).className).toBe('chip')
   expect(screen.getByRole('button', { name: 'Ainda há Detergente' }).className).toBe('chip quiet')
 })
@@ -63,104 +69,6 @@ test('products still learning or never bought say so', () => {
   renderIt()
   expect(screen.getByText(/a aprender/)).toBeTruthy()
   expect(screen.getByText(/nunca comprado/)).toBeTruthy()
-})
-
-test('products are grouped by what is missing first, then what may be, then what is there', () => {
-  data.products = [
-    prod({ id: 'a', name: 'Arroz', boughtKeys: ['2026-10-28'] }),
-    prod({ id: 'd', name: 'Detergente', location: 'limpeza', boughtKeys: ['2026-09-01', '2026-09-11', '2026-09-21'] }),
-    prod({ id: 'c', name: 'Café' }),
-  ]
-  data.shopping = [item({ productId: 'c' })]
-  renderIt()
-  const titles = screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent)
-  expect(titles).toEqual(['Falta (1)', 'Talvez falte (1)', 'Há (1)'])
-  expect(screen.getByRole('img', { name: 'Limpeza' })).toBeTruthy() // the zone icon on each row
-  expect(screen.getByRole('button', { name: 'Ainda há Detergente' })).toBeTruthy()
-})
-
-test('"Comprei" offers to record the spending without forcing it', () => {
-  data.products = [prod({ id: 'c', name: 'Café' })]
-  data.shopping = [item({ productId: 'c' })]
-  renderIt()
-  fireEvent.click(screen.getByRole('button', { name: 'Comprei Café' }))
-  fireEvent.click(screen.getByRole('button', { name: 'Registar gasto' }))
-  fireEvent.change(screen.getByPlaceholderText(/47,30/), { target: { value: '3,20' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Registar' }))
-  expect(exp.addExpense).toHaveBeenCalledWith(320, 'P', '2026-10-29')
-})
-
-test('Congelador products show their bags instead of a rhythm', () => {
-  data.products = [prod({ id: 'v', name: 'Vaca', location: 'congelador', boughtKeys: ['2026-10-01'] })]
-  data.bags = [bag({ productId: 'v', amount: 1, unit: 'kg' }), bag({ productId: 'v', amount: 1, unit: 'kg' })]
-  renderIt()
-  expect(screen.getByText('2 sacos · 2 kg')).toBeTruthy()
-  expect(screen.queryByText(/a aprender/)).toBeNull()
-})
-
-test('a bought Congelador product with no bags is Talvez falte, "não há no congelador"', () => {
-  data.products = [prod({ id: 'v', name: 'Vaca', location: 'congelador', boughtKeys: ['2026-10-01'], freezerLast: { amount: 1, unit: 'kg', key: '2026-10-01' } })]
-  renderIt()
-  expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Talvez falte (1)')
-  expect(screen.getByText('não há no congelador')).toBeTruthy()
-})
-
-test('Comprei on a Congelador product records the purchase and opens Para o congelador', () => {
-  data.products = [prod({ id: 'v', name: 'Vaca', location: 'congelador' })]
-  renderIt()
-  fireEvent.click(screen.getByRole('button', { name: 'Comprei Vaca' }))
-  expect(repo.boughtOutside).toHaveBeenCalled()
-  expect(screen.getByText(/Para o congelador/)).toBeTruthy()
-  fireEvent.click(screen.getByRole('button', { name: 'Agora não' }))
-  expect(screen.queryByText(/Para o congelador/)).toBeNull()
-  expect(repo.undoBought).not.toHaveBeenCalled()
-})
-
-test('Comprei on other zones does not open Para o congelador', () => {
-  data.products = [prod({ id: 'c', name: 'Café' })]
-  renderIt()
-  fireEvent.click(screen.getByRole('button', { name: 'Comprei Café' }))
-  expect(screen.queryByText(/Para o congelador/)).toBeNull()
-})
-
-test('Editar lets a Congelador product switch between Carne / peixe and Outros', () => {
-  data.products = [prod({ id: 'g', name: 'Gelado', location: 'congelador' }), prod({ id: 'c', name: 'Café' })]
-  renderIt()
-  fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
-  expect((screen.getByLabelText('Tipo de Gelado') as HTMLSelectElement).value).toBe('outros')
-  expect(screen.queryByLabelText('Tipo de Café')).toBeNull()
-  fireEvent.change(screen.getByLabelText('Tipo de Gelado'), { target: { value: 'carne' } })
-  expect(repo.setFreezerCategory).toHaveBeenCalledWith(expect.objectContaining({ id: 'g' }), 'carne')
-})
-
-test('Desfazer after Comprei closes an unanswered Para o congelador', () => {
-  data.products = [prod({ id: 'v', name: 'Vaca', location: 'congelador' })]
-  renderIt()
-  fireEvent.click(screen.getByRole('button', { name: 'Comprei Vaca' }))
-  fireEvent.click(screen.getByRole('button', { name: 'Desfazer' }))
-  expect(repo.undoBought).toHaveBeenCalled()
-  expect(screen.queryByText(/Para o congelador/)).toBeNull()
-})
-
-test('a Congelador product bought without entering bags stays Há, "sem sacos registados"', () => {
-  data.products = [prod({ id: 'v', name: 'Vaca', location: 'congelador', boughtKeys: ['2026-10-01'] })]
-  renderIt()
-  expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Há (1)')
-  expect(screen.getByText('sem sacos registados')).toBeTruthy()
-})
-
-test('several Comprei in a row gather the Congelador products in one card; Desfazer removes only that one', () => {
-  data.products = [prod({ id: 'v', name: 'Vaca', location: 'congelador' }), prod({ id: 'c', name: 'Café' }), prod({ id: 'g', name: 'Gelado', location: 'congelador' })]
-  renderIt()
-  fireEvent.click(screen.getByRole('button', { name: 'Comprei Vaca' }))
-  fireEvent.change(screen.getByLabelText('Quantidade de Vaca'), { target: { value: '5' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Comprei Café' }))
-  fireEvent.click(screen.getByRole('button', { name: 'Comprei Gelado' }))
-  expect((screen.getByLabelText('Quantidade de Vaca') as HTMLInputElement).value).toBe('5')
-  expect(screen.getByLabelText('Quantidade de Gelado')).toBeTruthy()
-  fireEvent.click(screen.getByRole('button', { name: 'Desfazer' }))
-  expect(screen.queryByLabelText('Quantidade de Gelado')).toBeNull()
-  expect(screen.getByLabelText('Quantidade de Vaca')).toBeTruthy()
 })
 
 test('a product snoozed 3 times says it is no longer suggested', () => {
@@ -195,4 +103,230 @@ test('a generic product is hidden from the states and shown in Editar, where it 
   expect(screen.getByDisplayValue('Carne')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'Deixar de ser genérico' }))
   expect(repo.unmakeGeneric).toHaveBeenCalledWith(expect.objectContaining({ id: 'carne' }))
+})
+
+test('"Comprei" offers to record the spending without forcing it', () => {
+  data.products = [prod({ id: 'c', name: 'Café' })]
+  data.shopping = [item({ productId: 'c' })]
+  renderIt()
+  fireEvent.click(screen.getByRole('button', { name: 'Comprei Café' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Registar gasto' }))
+  fireEvent.change(screen.getByPlaceholderText(/47,30/), { target: { value: '3,20' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Registar' }))
+  expect(exp.addExpense).toHaveBeenCalledWith(320, 'P', '2026-10-29')
+})
+
+test('Editar lets a Congelador product switch between Carne / peixe and Outros', () => {
+  data.products = [prod({ id: 'g', name: 'Gelado', location: 'congelador' }), prod({ id: 'c', name: 'Café' })]
+  renderIt()
+  fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
+  expect((screen.getByLabelText('Tipo de Gelado') as HTMLSelectElement).value).toBe('outros')
+  expect(screen.queryByLabelText('Tipo de Café')).toBeNull()
+  fireEvent.change(screen.getByLabelText('Tipo de Gelado'), { target: { value: 'carne' } })
+  expect(repo.setFreezerCategory).toHaveBeenCalledWith(expect.objectContaining({ id: 'g' }), 'carne')
+})
+
+// --- by place, with − número + (spec §5.1, §5.2, §5.6)
+
+const fridge = (p: Partial<Product>) => prod({ location: 'frigorifico', ...p })
+
+test('each tab shows only the products of its place', () => {
+  data.products = [fridge({ name: 'Iogurtes', count: 2 }), prod({ name: 'Arroz' }), prod({ name: 'Lixívia', location: 'limpeza' })]
+  render(<MemoryRouter><Casa /></MemoryRouter>)
+  expect(screen.getByRole('tab', { name: 'Frigorífico' }).getAttribute('aria-selected')).toBe('true')
+  expect(screen.getByText('Iogurtes')).toBeTruthy()
+  expect(screen.queryByText('Arroz')).toBeNull()
+  fireEvent.click(screen.getByRole('tab', { name: 'Despensa' }))
+  expect(screen.getByText('Arroz')).toBeTruthy()
+  expect(screen.queryByText('Iogurtes')).toBeNull()
+  expect(screen.queryByText('Lixívia')).toBeNull()
+})
+
+test('the chosen tab is kept on the phone', () => {
+  renderIt('Limpeza')
+  expect(localStorage.getItem('casa.tab')).toBe('limpeza')
+  cleanup()
+  render(<MemoryRouter><Casa /></MemoryRouter>)
+  expect(screen.getByRole('tab', { name: 'Limpeza' }).getAttribute('aria-selected')).toBe('true')
+})
+
+test('a broken saved tab falls back to Frigorífico', () => {
+  localStorage.setItem('casa.tab', 'congelador')
+  render(<MemoryRouter><Casa /></MemoryRouter>)
+  expect(screen.getByRole('tab', { name: 'Frigorífico' }).getAttribute('aria-selected')).toBe('true')
+})
+
+test('"−" on Iogurtes 2 takes one, and Desfazer gives it back', () => {
+  data.products = [fridge({ id: 'i', name: 'Iogurtes', count: 2 })]
+  renderIt('Frigorífico')
+  fireEvent.click(screen.getByRole('button', { name: 'Menos Iogurtes' }))
+  expect(stock.changeCount).toHaveBeenCalledWith(expect.objectContaining({ id: 'i' }), -1)
+  fireEvent.click(screen.getByRole('button', { name: 'Desfazer' }))
+  expect(stock.changeCount).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'i' }), 1)
+})
+
+test('"−" on Iogurtes 1 says "Acabaram os Iogurtes" and "Pôr na lista" puts them on the list', () => {
+  data.products = [fridge({ id: 'i', name: 'Iogurtes', count: 1 })]
+  renderIt('Frigorífico')
+  fireEvent.click(screen.getByRole('button', { name: 'Menos Iogurtes' }))
+  expect(screen.getByText('Acabaram os Iogurtes')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Pôr na lista' }))
+  expect(repo.markMissing).toHaveBeenCalledWith(expect.objectContaining({ id: 'i' }), 'P', [])
+})
+
+test('when it is already on the list the toast only says "Acabaram os Iogurtes"', () => {
+  data.products = [fridge({ id: 'i', name: 'Iogurtes', count: 1 })]
+  data.shopping = [item({ productId: 'i' })]
+  renderIt('Frigorífico')
+  fireEvent.click(screen.getByRole('button', { name: 'Menos Iogurtes' }))
+  expect(screen.getByText('Acabaram os Iogurtes')).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'Pôr na lista' })).toBeNull()
+})
+
+test('"+" adds one; tapping the number asks "Quantos há?"', () => {
+  data.products = [fridge({ id: 'i', name: 'Iogurtes', count: 2 })]
+  renderIt('Frigorífico')
+  fireEvent.click(screen.getByRole('button', { name: 'Mais Iogurtes' }))
+  expect(stock.changeCount).toHaveBeenCalledWith(expect.objectContaining({ id: 'i' }), 1)
+  fireEvent.click(screen.getByRole('button', { name: 'Iogurtes: 2, mudar' }))
+  fireEvent.change(screen.getByLabelText('Quantos há?'), { target: { value: '9' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+  expect(stock.setCount).toHaveBeenCalledWith(expect.objectContaining({ id: 'i' }), 9)
+  expect(stock.setLastQty).not.toHaveBeenCalled()
+})
+
+test('there is no "−" at 0, and a counted product never shows "Ainda há"', () => {
+  data.products = [fridge({ id: 'l', name: 'Leite', count: 0, boughtKeys: ['2026-09-01', '2026-09-11', '2026-09-21'] })]
+  renderIt('Frigorífico')
+  expect(screen.queryByRole('button', { name: 'Menos Leite' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Ainda há Leite' })).toBeNull()
+  expect(screen.getByText('acabou')).toBeTruthy()
+})
+
+test('on the list at 0 the note says "acabou · está na lista"', () => {
+  data.products = [fridge({ id: 'l', name: 'Leite', count: 0 })]
+  data.shopping = [item({ productId: 'l' })]
+  renderIt('Frigorífico')
+  expect(screen.getByText('acabou · está na lista')).toBeTruthy()
+})
+
+test('a product still to count shows "—", and entering 6 sets the count', () => {
+  data.products = [fridge({ id: 'k', name: 'Kefir' })]
+  renderIt('Frigorífico')
+  expect(screen.getByText('—')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Kefir: por contar, mudar' }))
+  fireEvent.change(screen.getByLabelText('Quantos há?'), { target: { value: '6' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+  expect(stock.setCount).toHaveBeenCalledWith(expect.objectContaining({ id: 'k' }), 6)
+  expect(stock.changeCount).not.toHaveBeenCalled()
+})
+
+test('"+" on a product still to count also asks "Quantos há?"', () => {
+  data.products = [fridge({ id: 'k', name: 'Kefir' })]
+  renderIt('Frigorífico')
+  fireEvent.click(screen.getByRole('button', { name: 'Mais Kefir' }))
+  expect(screen.getByLabelText('Quantos há?')).toBeTruthy()
+  expect(stock.changeCount).not.toHaveBeenCalled()
+})
+
+test('a pending quantity says "falta pôr a quantidade"', () => {
+  data.products = [fridge({ name: 'Kefir', count: 0, qtyPending: true })]
+  renderIt('Frigorífico')
+  expect(screen.getByText('falta pôr a quantidade')).toBeTruthy()
+})
+
+test('a count that may be stale asks "confirma: ainda há 5?" and dims the number', () => {
+  data.products = [prod({ name: 'Arroz', count: 5, boughtKeys: ['2026-09-01', '2026-09-08'] })]
+  renderIt()
+  expect(screen.getByText(/confirma: ainda há 5\?/)).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'Arroz: 5, mudar' }).className).toContain('dim')
+})
+
+test('"Comprei" at 0 without a usual quantity asks "Quantos compraste?"', () => {
+  data.products = [fridge({ id: 'k', name: 'Kefir', count: 0 })]
+  renderIt('Frigorífico')
+  expect(screen.queryByRole('button', { name: 'Mais Kefir' })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Comprei Kefir' }))
+  fireEvent.change(screen.getByLabelText('Quantos compraste?'), { target: { value: '4' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+  expect(repo.boughtOutside).toHaveBeenCalledWith(expect.objectContaining({ id: 'k' }), [], '2026-10-29', 'P')
+  expect(stock.changeCount).toHaveBeenCalledWith(expect.objectContaining({ id: 'k' }), 4)
+  expect(stock.setLastQty).toHaveBeenCalledWith(expect.objectContaining({ id: 'k' }), 4)
+  expect(stock.setPurchaseQty).toHaveBeenCalledWith('pu1', 4)
+})
+
+test('cancelling "Quantos compraste?" records nothing', () => {
+  data.products = [fridge({ id: 'k', name: 'Kefir', count: 0 })]
+  renderIt('Frigorífico')
+  fireEvent.click(screen.getByRole('button', { name: 'Comprei Kefir' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+  expect(repo.boughtOutside).not.toHaveBeenCalled()
+  expect(stock.changeCount).not.toHaveBeenCalled()
+})
+
+test('"Comprei" from the row menu adds the usual quantity; Desfazer takes it back', () => {
+  data.products = [fridge({ id: 'i', name: 'Iogurtes', count: 2, lastQty: 6 })]
+  renderIt('Frigorífico')
+  fireEvent.click(screen.getByRole('button', { name: 'Mais ações de Iogurtes' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Comprei Iogurtes' }))
+  expect(repo.boughtOutside).toHaveBeenCalled()
+  expect(stock.changeCount).toHaveBeenCalledWith(expect.objectContaining({ id: 'i' }), 6)
+  expect(stock.setPurchaseQty).toHaveBeenCalledWith('pu1', 6)
+  expect(stock.setLastQty).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Desfazer' }))
+  expect(repo.undoBought).toHaveBeenCalled()
+  expect(stock.changeCount).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'i' }), -6)
+})
+
+test('a product not counted keeps today\'s actions and no number', () => {
+  data.products = [fridge({ name: 'Manteiga', uncounted: true, boughtKeys: ['2026-10-25'] })]
+  renderIt('Frigorífico')
+  expect(screen.getByText(/sem contar · comprado há 4 dias/)).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'Falta Manteiga' })).toBeTruthy()
+  expect(screen.queryByRole('button', { name: /Manteiga: .*mudar/ })).toBeNull()
+})
+
+test('Congelador products leave the lists; each tab ends with "Congelador: N sacos"', () => {
+  data.products = [prod({ id: 'v', name: 'Vaca', location: 'congelador' }), fridge({ name: 'Iogurtes', count: 2 })]
+  data.bags = [bag({ productId: 'v' }), bag({ productId: 'v' }), bag({ productId: 'v', where: 'frigorifico', movedKey: '2026-10-28' })]
+  renderIt('Frigorífico')
+  expect(screen.queryByText('Vaca')).toBeNull()
+  const link = screen.getByRole('link', { name: /Congelador: 2 sacos/ })
+  expect(link.getAttribute('href')).toBe('/congelador')
+  fireEvent.click(screen.getByRole('tab', { name: 'Limpeza' }))
+  expect(screen.getByRole('link', { name: /Congelador: 2 sacos/ })).toBeTruthy()
+})
+
+test('Editar: "Contar quantidades" turns counting off and on, not for Congelador', () => {
+  data.products = [fridge({ id: 'i', name: 'Iogurtes', count: 2 }), prod({ id: 's', name: 'Sal', uncounted: true }), prod({ id: 'v', name: 'Vaca', location: 'congelador' })]
+  renderIt('Frigorífico')
+  fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
+  const iog = screen.getByRole('switch', { name: 'Contar quantidades de Iogurtes' }) as HTMLInputElement
+  expect(iog.checked).toBe(true)
+  fireEvent.click(iog)
+  expect(stock.setUncounted).toHaveBeenCalledWith(expect.objectContaining({ id: 'i' }), true)
+  const sal = screen.getByRole('switch', { name: 'Contar quantidades de Sal' }) as HTMLInputElement
+  expect(sal.checked).toBe(false)
+  fireEvent.click(sal)
+  expect(stock.setUncounted).toHaveBeenLastCalledWith(expect.objectContaining({ id: 's' }), false)
+  expect(screen.queryByRole('switch', { name: 'Contar quantidades de Vaca' })).toBeNull()
+})
+
+test('"+ Produto" takes an optional "Quantos há?"', () => {
+  renderIt('Frigorífico')
+  fireEvent.change(screen.getByPlaceholderText('Nome (ex.: Leite)'), { target: { value: 'Kefir' } })
+  fireEvent.change(screen.getByLabelText('Quantos há? (opcional)'), { target: { value: '3' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }))
+  expect(repo.addProduct).toHaveBeenCalledWith('Kefir', 'frigorifico', [], 3)
+})
+
+test('"+ Produto" left empty stays to count; a bad number is not added', () => {
+  renderIt('Despensa')
+  fireEvent.change(screen.getByPlaceholderText('Nome (ex.: Leite)'), { target: { value: 'Arroz' } })
+  fireEvent.change(screen.getByLabelText('Quantos há? (opcional)'), { target: { value: '1,5' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }))
+  expect(repo.addProduct).not.toHaveBeenCalled()
+  fireEvent.change(screen.getByLabelText('Quantos há? (opcional)'), { target: { value: '' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }))
+  expect(repo.addProduct).toHaveBeenCalledWith('Arroz', 'despensa', [], undefined)
 })

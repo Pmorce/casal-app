@@ -1,4 +1,5 @@
-import { changeCount, setCount, setLastQty, setUncounted } from './stockRepo'
+import { changeCount, setCount, setLastQty, setPurchaseQty, setUncounted } from './stockRepo'
+import { fire } from './write'
 import { prod } from '../domain/testFactories'
 
 const fs = vi.hoisted(() => ({ updateDoc: vi.fn(async () => {}) }))
@@ -34,4 +35,10 @@ test('"Não contar este" on and off never writes undefined', () => {
 test('the usual quantity is stored as given', () => {
   setLastQty(p, 4)
   expect(fs.updateDoc).toHaveBeenCalledWith({ path: 'products/p1' }, { lastQty: 4 })
+})
+
+test('"Comprei" on a counted product puts the units on its purchase row, quietly', () => {
+  setPurchaseQty('pu1', 4)
+  expect(fs.updateDoc).toHaveBeenCalledWith({ path: 'purchases/pu1' }, { amount: 4, unit: 'un' })
+  expect(fire).toHaveBeenCalledWith(expect.anything(), { quiet: true })
 })

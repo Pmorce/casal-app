@@ -16,3 +16,7 @@ export const setUncounted = (p: Product, on: boolean): void => update(p, { uncou
 
 /** Usual quantity per purchase, asked once for what is new. */
 export const setLastQty = (p: Product, n: number): void => update(p, { lastQty: n })
+
+/** "Comprei" on a counted product: the units go on its purchase row. Quiet: the purchase itself is what matters. */
+export const setPurchaseQty = (purchaseId: string, n: number): void =>
+  fire(updateDoc(doc(db, 'purchases', purchaseId), { amount: n, unit: 'un' }), { quiet: true })
