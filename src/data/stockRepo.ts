@@ -20,3 +20,25 @@ export const setLastQty = (p: Product, n: number): void => update(p, { lastQty: 
 /** "Comprei" on a counted product: the units go on its purchase row. Quiet: the purchase itself is what matters. */
 export const setPurchaseQty = (purchaseId: string, n: number): void =>
   fire(updateDoc(doc(db, 'purchases', purchaseId), { amount: n, unit: 'un' }), { quiet: true })
+
+/** "Agora não" in "O que entrou": bought, quantity still to put in (one update per product). */
+export const markQtyPending = (products: Product[]): void => products.forEach(p => update(p, { qtyPending: true }))
+
+/** The number was put in: the pending mark goes. */
+export const clearQtyPending = (p: Product): void => update(p, { qtyPending: deleteField() })
+
+/** What "O que entrou" wrote, with the products as they were before. */
+export interface EntradaDone {
+  saved: { product: Product; n: number }[]
+  pending: Product[]
+}
+
+/** Undoing "Terminar" after "O que entrou": the units come off again (relative) and lastQty/qtyPending go back as they were. */
+export function undoEntrada({ saved, pending }: EntradaDone): void {
+  const was = (p: Product) => ({ qtyPending: p.qtyPending ?? deleteField() })
+  saved.forEach(({ product, n }) => {
+    changeCount(product, -n)
+    update(product, { lastQty: product.lastQty ?? deleteField(), ...was(product) })
+  })
+  pending.forEach(p => update(p, was(p)))
+}

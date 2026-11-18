@@ -29,6 +29,7 @@ vi.mock('firebase/firestore', async () => ({
   serverTimestamp: () => 'now',
   arrayUnion: (...v: unknown[]) => ({ union: v }),
   arrayRemove: (...v: unknown[]) => ({ remove: v }),
+  increment: (n: number) => ({ increment: n }),
 }))
 
 beforeEach(() => vi.clearAllMocks())
@@ -162,12 +163,23 @@ test('undoFinish puts the items back and deletes rhythm fields that did not exis
 })
 
 test('undoFinish deletes the purchases, clears generic and brings the trip back', () => {
-  const done = { items: [], products: [], finishId: 'f', purchaseIds: { a: 'pu1', b: 'pu2' }, generic: ['carne'], trip: lidl }
+  const done = { items: [], products: [], finishId: 'f', purchaseIds: { a: 'pu1', b: 'pu2' }, generic: ['carne'], trip: lidl, counted: [] }
   undoFinish(done)
   expect(fs.del).toHaveBeenCalledWith(expect.objectContaining({ path: 'purchases/pu1' }))
   expect(fs.del).toHaveBeenCalledWith(expect.objectContaining({ path: 'purchases/pu2' }))
   expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'products/carne' }), { generic: 'DEL' })
   expect(trips.restoreTrip).toHaveBeenCalledWith(lidl)
+})
+
+test('Terminar adds the usual quantity of Iogurtes (Ana) with increment, and undo takes it away again', () => {
+  const iog = prod({ id: 'iog', name: 'Iogurtes', location: 'frigorifico', count: 2, lastQty: 8 })
+  const done = finishWith([item({ id: 'i1', text: 'Iogurtes', status: 'carrinho', productId: 'iog' })], [iog])
+  expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'products/iog' }), { count: { increment: 8 } })
+  expect(fs.set).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ productId: 'iog', amount: 8, unit: 'un' }))
+  expect(done.counted).toEqual([{ productId: 'iog', qty: 8 }])
+  vi.clearAllMocks()
+  undoFinish(done)
+  expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'products/iog' }), { count: { increment: -8 } })
 })
 
 test('setFreezerCategory updates only that field', () => {

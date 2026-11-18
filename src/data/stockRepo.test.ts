@@ -1,4 +1,4 @@
-import { changeCount, setCount, setLastQty, setPurchaseQty, setUncounted } from './stockRepo'
+import { changeCount, clearQtyPending, markQtyPending, setCount, setLastQty, setPurchaseQty, setUncounted, undoEntrada } from './stockRepo'
 import { fire } from './write'
 import { prod } from '../domain/testFactories'
 
@@ -41,4 +41,28 @@ test('"Comprei" on a counted product puts the units on its purchase row, quietly
   setPurchaseQty('pu1', 4)
   expect(fs.updateDoc).toHaveBeenCalledWith({ path: 'purchases/pu1' }, { amount: 4, unit: 'un' })
   expect(fire).toHaveBeenCalledWith(expect.anything(), { quiet: true })
+})
+
+test('"Agora não" (Rui) marks each product pending, one update each', () => {
+  markQtyPending([p, prod({ id: 'p2', name: 'Água' })])
+  expect(fs.updateDoc).toHaveBeenCalledWith({ path: 'products/p1' }, { qtyPending: true })
+  expect(fs.updateDoc).toHaveBeenCalledWith({ path: 'products/p2' }, { qtyPending: true })
+  expect(fs.updateDoc).toHaveBeenCalledTimes(2)
+})
+
+test('putting the number in settles the pending mark', () => {
+  clearQtyPending(p)
+  expect(fs.updateDoc).toHaveBeenCalledWith({ path: 'products/p1' }, { qtyPending: 'DEL' })
+})
+
+test('undoing "O que entrou" (Ana) takes the units away and puts lastQty and qtyPending back as they were', () => {
+  const was = prod({ id: 'k', name: 'Kefir', qtyPending: true })
+  const agua = prod({ id: 'a', name: 'Água' })
+  undoEntrada({ saved: [{ product: was, n: 4 }], pending: [agua] })
+  expect(fs.updateDoc).toHaveBeenCalledWith({ path: 'products/k' }, { count: { increment: -4 } })
+  expect(fs.updateDoc).toHaveBeenCalledWith({ path: 'products/k' }, { lastQty: 'DEL', qtyPending: true })
+  expect(fs.updateDoc).toHaveBeenCalledWith({ path: 'products/a' }, { qtyPending: 'DEL' })
+  for (const [, data] of fs.updateDoc.mock.calls as unknown as [unknown, Record<string, unknown>][]) {
+    expect(Object.values(data)).not.toContain(undefined)
+  }
 })

@@ -1,4 +1,5 @@
 import { findProduct } from './shopping'
+import { isCounted } from './stock'
 import type { DateKey } from './dates'
 import type { FreezerUnit, Part, Product, Purchase, ShoppingItem, Trip } from './types'
 
@@ -14,6 +15,10 @@ export interface FinishPlan {
   stores: (string | null)[]
   /** one per part (pre-filled) + one per other Congelador product */
   freezer: { key: string; productId: string; amount?: number; unit?: FreezerUnit }[]
+  /** counted products with a usual quantity: count += qty; their purchase row (key) says `qty un` */
+  counted: { productId: string; qty: number; key: string }[]
+  /** counted products without a usual quantity: asked in "O que entrou" */
+  entrada: { productId: string; key: string }[]
 }
 
 const inCart = (items: ShoppingItem[]) => items.filter(i => i.status === 'carrinho')
@@ -52,7 +57,10 @@ export function planFinish(
   const purchases: FinishPlan['purchases'] = []
   const freezer: FinishPlan['freezer'] = []
   const plainFreezer: FinishPlan['freezer'] = []
+  const counted: FinishPlan['counted'] = []
+  const entrada: FinishPlan['entrada'] = []
   const used: (string | undefined)[] = []
+  const seen = (productId: string) => counted.some(c => c.productId === productId) || entrada.some(e => e.productId === productId)
 
   for (const i of cart) {
     if (hasParts(i)) {
@@ -73,7 +81,13 @@ export function planFinish(
       const p = i.productId ? byId.get(i.productId) : undefined
       const store = storeOf(i)
       used.push(store)
-      purchases.push({ key: i.id, row: row(i.text, p?.id, store) })
+      // counted products move the number (once each, even if two items point at it); the rest record the purchase as before
+      const qty = p && isCounted(p) && !seen(p.id) ? (p.lastQty ?? null) : undefined
+      if (p && qty !== undefined) {
+        if (qty !== null) counted.push({ productId: p.id, qty, key: i.id })
+        else entrada.push({ productId: p.id, key: i.id })
+      }
+      purchases.push({ key: i.id, row: row(i.text, p?.id, store, qty ? { amount: qty, unit: 'un' } : undefined) })
       if (p) {
         bought.push(p.id)
         if (p.location === 'congelador' && !plainFreezer.some(f => f.productId === p.id)) plainFreezer.push({ key: i.id, productId: p.id })
@@ -94,6 +108,8 @@ export function planFinish(
     stores,
     // plain rows are for the OTHER congelador products: one that is also a part already has its part rows
     freezer: [...freezer, ...plainFreezer.filter(f => !freezer.some(x => x.productId === f.productId))],
+    counted,
+    entrada,
   }
 }
 

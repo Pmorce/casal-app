@@ -5,6 +5,7 @@ import { useToday } from '../hooks/useToday'
 import { addItem, classifyItem, deleteItem, finish, markMissing, snooze, toggleCart, undoFinish } from '../data/shoppingRepo'
 import { restore } from '../data/restore'
 import { undoFreeze, type FrozenBatch } from '../data/freezerRepo'
+import { undoEntrada, type EntradaDone } from '../data/stockRepo'
 import { addCustomStore, changeStore, leaveTrip, restoreTrip, startTrip } from '../data/tripRepo'
 import { maybeMissing } from '../domain/shopping'
 import { shownGap } from '../domain/rhythm'
@@ -18,6 +19,7 @@ import type { FreezerBag, Product, Purchase, ShoppingItem, Zone } from '../domai
 import UndoToast from '../components/UndoToast'
 import SpentForm from '../components/SpentForm'
 import FreezeForm, { type FreezeInput } from '../components/FreezeForm'
+import EntradaForm from '../components/EntradaForm'
 import PageHeader from '../components/PageHeader'
 import Avatar from '../components/Avatar'
 import Icon, { GROUP_ICON } from '../components/Icon'
@@ -55,13 +57,17 @@ export default function Compras() {
   const [guess, setGuess] = useState<Zone | null>(null)
   const [undo, setUndo] = useState<{ message: string; run: () => void } | null>(null)
   const closeUndo = useCallback(() => setUndo(null), [])
-  // after "Terminar compras": first what went to the freezer, then how much it was, one card per store (null: no store)
+  // after "Terminar compras": first what went to the freezer, then "O que entrou" (counted products new to counting),
+  // then how much it was, one card per store (null: no store)
   const [freezing, setFreezing] = useState<FreezeInput[] | null>(null)
+  const [entrada, setEntrada] = useState<{ product: Product; purchaseId?: string }[] | null>(null)
   const [spentQueue, setSpentQueue] = useState<(string | null)[]>([])
   // "Terminar" without a trip and with ticks of no store asks "Onde foi?" first
   const [askingStore, setAskingStore] = useState(false)
   // bags saved from the freezer card; a ref so the undo created before them still sees them
   const savedBags = useRef<FrozenBatch[]>([])
+  // the same for "O que entrou"
+  const savedEntrada = useRef<EntradaDone[]>([])
   // the shared trip: a store picker is open to start it or to change store
   const trip = activeTrip(meta, today)
   const [picking, setPicking] = useState<'start' | 'change' | null>(null)
@@ -128,15 +134,32 @@ export default function Compras() {
       return [{ key: f.key, product, ...(f.amount ? { amount: f.amount } : {}), ...(f.unit ? { unit: f.unit } : {}), ...(purchaseId ? { purchaseId } : {}) }]
     }).sort((a, b) => a.product.name.localeCompare(b.product.name, 'pt-PT'))
     savedBags.current = []
+    savedEntrada.current = []
     // a second "Terminar" with the card still open adds to it (what was typed stays)
     setFreezing(open => {
       const all = [...(open ?? []), ...toFreeze.filter(r => !open?.some(o => o.key === r.key))]
       return all.length ? all : null
     })
+    const toEnter = plan.entrada.flatMap(e => {
+      const product = products.find(p => p.id === e.productId)
+      const purchaseId = done.purchaseIds[e.key]
+      return product ? [{ product, ...(purchaseId ? { purchaseId } : {}) }] : []
+    }).sort((a, b) => a.product.name.localeCompare(b.product.name, 'pt-PT'))
+    setEntrada(open => {
+      const all = [...(open ?? []), ...toEnter.filter(r => !open?.some(o => o.product.id === r.product.id))]
+      return all.length ? all : null
+    })
     setSpentQueue(q => [...q, ...plan.stores.filter(s => !q.includes(s))])
     setUndo({
       message: 'Compras terminadas',
-      run: () => { undoFinish(done); savedBags.current.forEach(b => undoFreeze(b)); setFreezing(null); setSpentQueue([]) },
+      run: () => {
+        undoFinish(done)
+        savedBags.current.forEach(b => undoFreeze(b))
+        savedEntrada.current.forEach(e => undoEntrada(e))
+        setFreezing(null)
+        setEntrada(null)
+        setSpentQueue([])
+      },
     })
   }
 
@@ -238,7 +261,11 @@ export default function Compras() {
           <FreezeForm rows={freezing} today={today}
             onSaved={batch => { savedBags.current = [...savedBags.current, batch] }} onDone={() => setFreezing(null)} />
         )}
-        {spentQueue.length > 0 && !freezing && (
+        {entrada && !freezing && (
+          <EntradaForm rows={entrada}
+            onSaved={d => { savedEntrada.current = [...savedEntrada.current, d] }} onDone={() => setEntrada(null)} />
+        )}
+        {spentQueue.length > 0 && !freezing && !entrada && (
           // keyed by store: each card starts empty, nothing typed for one store carries to the next
           <SpentForm key={`loja:${spentQueue[0] ?? ''}`} today={today} store={spentQueue[0] ?? undefined}
             title={spentQueue[0] ? `${spentQueue[0]} — quanto foi?` : 'Compras terminadas. Quanto foi?'}

@@ -1,4 +1,4 @@
-import { addDoc, arrayRemove, arrayUnion, collection, deleteDoc, deleteField, doc, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore'
+import { addDoc, arrayRemove, arrayUnion, collection, deleteDoc, deleteField, doc, increment, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore'
 import { db } from './firebase'
 import { fire } from './write'
 import { cleanText, findProduct, isOnList, normalize } from '../domain/shopping'
@@ -146,6 +146,8 @@ export interface FinishedShopping {
   generic: string[]
   /** the trip it ended, to bring back on undo */
   trip: Trip | null
+  /** units added to counted products, taken away again on undo */
+  counted: { productId: string; qty: number }[]
 }
 
 /**
@@ -168,6 +170,9 @@ export function finish(items: ShoppingItem[], products: Product[], plan: FinishP
   fire(batch.commit())
   bought.forEach(p => updateProduct(p.id, purchased(p, today)))
   generic.forEach(id => updateProduct(id, { generic: true }))
+  // relative, so a "−" on the other phone meanwhile is not lost
+  const counted = plan.counted.filter(c => products.some(p => p.id === c.productId)).map(({ productId, qty }) => ({ productId, qty }))
+  counted.forEach(c => updateProduct(c.productId, { count: increment(c.qty) }))
   return {
     items: items.filter(i => plan.deleteIds.includes(i.id)),
     products: bought.map(rhythmFields),
@@ -175,6 +180,7 @@ export function finish(items: ShoppingItem[], products: Product[], plan: FinishP
     purchaseIds,
     generic,
     trip,
+    counted,
   }
 }
 
@@ -185,6 +191,7 @@ export function undoFinish(done: FinishedShopping): void {
   fire(batch.commit())
   done.products.forEach(p => updateProduct(p.id, restoreRhythm(p)))
   done.generic.forEach(id => updateProduct(id, { generic: deleteField() }))
+  done.counted.forEach(c => updateProduct(c.productId, { count: increment(-c.qty) }))
   if (done.trip) restoreTrip(done.trip)
 }
 

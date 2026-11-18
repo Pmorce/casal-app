@@ -156,3 +156,36 @@ test('a plain Congelador item whose product is also a part gets no second freeze
   const plan = planFinish(items, [vaca, carne], ctx())
   expect(plan.freezer).toEqual([{ key: 'a', productId: 'vaca', amount: 3, unit: 'kg' }])
 })
+
+test('Terminar: counted products add their usual quantity; new ones go to "O que entrou"; the rest as before (Ana)', () => {
+  const products = [
+    prod({ id: 'iog', name: 'Iogurtes', location: 'frigorifico', count: 2, lastQty: 8 }),
+    prod({ id: 'kef', name: 'Kefir', location: 'frigorifico', count: 0 }),
+    prod({ id: 'arr', name: 'Arroz', location: 'despensa' }),
+    prod({ id: 'sal', name: 'Sal', location: 'despensa', count: 1, lastQty: 1, uncounted: true }),
+  ]
+  const items = [
+    item({ id: 'i1', text: 'Iogurtes', status: 'carrinho', productId: 'iog' }),
+    item({ id: 'i2', text: 'Kefir', status: 'carrinho', productId: 'kef' }),
+    item({ id: 'i3', text: 'Arroz', status: 'carrinho', productId: 'arr' }),
+    item({ id: 'i4', text: 'Sal', status: 'carrinho', productId: 'sal' }),
+  ]
+  const plan = planFinish(items, products, ctx())
+  expect(plan.counted).toEqual([{ productId: 'iog', qty: 8, key: 'i1' }])
+  expect(plan.entrada).toEqual([{ productId: 'kef', key: 'i2' }])
+  const rowOf = (key: string) => plan.purchases.find(p => p.key === key)!.row
+  expect(rowOf('i1')).toMatchObject({ amount: 8, unit: 'un' })
+  expect(rowOf('i2')).not.toHaveProperty('amount')
+  expect(rowOf('i3')).not.toHaveProperty('amount')
+  expect(rowOf('i3')).not.toHaveProperty('unit')
+  expect(rowOf('i4')).not.toHaveProperty('amount')
+})
+
+test('a counted product twice in the cart (Rui) adds once', () => {
+  const products = [prod({ id: 'iog', name: 'Iogurtes', location: 'frigorifico', count: 2, lastQty: 8 })]
+  const items = [
+    item({ id: 'i1', text: 'Iogurtes', status: 'carrinho', productId: 'iog' }),
+    item({ id: 'i2', text: 'Iogurtes gregos', status: 'carrinho', productId: 'iog' }),
+  ]
+  expect(planFinish(items, products, ctx()).counted).toEqual([{ productId: 'iog', qty: 8, key: 'i1' }])
+})

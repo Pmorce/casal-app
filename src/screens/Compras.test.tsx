@@ -28,6 +28,10 @@ vi.mock('../data/expensesRepo', () => exp)
 const frozen = { bagIds: ['b1', 'b2'], previous: [] }
 const freezer = vi.hoisted(() => ({ freezeBought: vi.fn((): unknown => null), undoFreeze: vi.fn() }))
 vi.mock('../data/freezerRepo', () => freezer)
+const stock = vi.hoisted(() => ({
+  changeCount: vi.fn(), setLastQty: vi.fn(), setPurchaseQty: vi.fn(), markQtyPending: vi.fn(), clearQtyPending: vi.fn(), undoEntrada: vi.fn(),
+}))
+vi.mock('../data/stockRepo', () => stock)
 
 const renderIt = () => render(<MemoryRouter><Compras /></MemoryRouter>)
 beforeEach(() => { vi.clearAllMocks(); subs.length = 0; data.products = []; data.bags = []; data.meta = []; freezer.freezeBought.mockReturnValue(frozen) })
@@ -198,6 +202,61 @@ test('finishing with Congelador products asks what went to the freezer, then how
   expect(freezer.freezeBought).toHaveBeenCalled()
   expect(screen.queryByText(/Para o congelador/)).toBeNull()
   expect(screen.getByText(/Quanto foi/)).toBeTruthy()
+})
+
+const kefirCart = () => {
+  data.products = [prod({ id: 'k', name: 'Kefir', location: 'frigorifico', count: 0 })]
+  data.shopping = [item({ id: 'ik', text: 'Kefir', status: 'carrinho', productId: 'k' })]
+}
+
+test('Ana finishes with Kefir (counted, new): "O que entrou" comes before "Quanto foi?"', () => {
+  kefirCart()
+  repo.finish.mockReturnValueOnce({ items: [], products: [], purchaseIds: { ik: 'pu1' } })
+  renderIt()
+  terminar()
+  expect(screen.getByText('O que entrou')).toBeTruthy()
+  expect(screen.queryByText(/Quanto foi/)).toBeNull()
+  fireEvent.change(screen.getByLabelText('Unidades de Kefir'), { target: { value: '4' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+  expect(stock.setPurchaseQty).toHaveBeenCalledWith('pu1', 4)
+  expect(screen.queryByText('O que entrou')).toBeNull()
+  expect(screen.getByText(/Quanto foi/)).toBeTruthy()
+})
+
+test('Rui: the freezer card comes first, then "O que entrou"', () => {
+  data.products = [prod({ id: 'v', name: 'Carne de vaca', location: 'congelador' }), prod({ id: 'k', name: 'Kefir', location: 'frigorifico', count: 0 })]
+  data.shopping = [item({ text: 'Carne de vaca', status: 'carrinho', productId: 'v' }), item({ text: 'Kefir', status: 'carrinho', productId: 'k' })]
+  renderIt()
+  terminar()
+  expect(screen.getByText(/Para o congelador/)).toBeTruthy()
+  expect(screen.queryByText('O que entrou')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Agora não' }))
+  expect(screen.getByText('O que entrou')).toBeTruthy()
+  expect(screen.queryByText(/Quanto foi/)).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Agora não' }))
+  expect(stock.markQtyPending).toHaveBeenCalledWith([expect.objectContaining({ id: 'k' })])
+  expect(screen.getByText(/Quanto foi/)).toBeTruthy()
+})
+
+test('Desfazer the "Terminar" closes "O que entrou" (Ana)', () => {
+  kefirCart()
+  renderIt()
+  terminar()
+  fireEvent.click(screen.getByRole('button', { name: 'Desfazer' }))
+  expect(repo.undoFinish).toHaveBeenCalled()
+  expect(screen.queryByText('O que entrou')).toBeNull()
+  expect(stock.undoEntrada).not.toHaveBeenCalled()
+})
+
+test('Desfazer after saving "O que entrou" also takes those units away (Rui)', () => {
+  kefirCart()
+  renderIt()
+  terminar()
+  fireEvent.change(screen.getByLabelText('Unidades de Kefir'), { target: { value: '4' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Desfazer' }))
+  expect(stock.undoEntrada).toHaveBeenCalledWith({ saved: [{ product: expect.objectContaining({ id: 'k' }), n: 4 }], pending: [] })
+  expect(screen.queryByText(/Quanto foi/)).toBeNull()
 })
 
 test('finishing without Congelador products goes straight to "Quanto foi?"', () => {
