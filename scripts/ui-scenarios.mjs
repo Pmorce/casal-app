@@ -41,6 +41,91 @@ export default {
     await shot(a.page, 'casa-after')
   },
 
+  // Ida às compras: viagem partilhada (Lidl → Continente), cartão da carne com partes, terminar por loja.
+  async ida({ login, shot, expectText }) {
+    const { resetDb, adminDb } = await import('./ui-admin.mjs')
+    await resetDb()
+    const prod = (id, name, location, extra = {}) => adminDb.doc(`products/${id}`).set({ name, location, ...extra })
+    await prod('cafe', 'Café', 'despensa')
+    await prod('leite', 'Leite', 'frigorifico')
+    await prod('carne', 'Carne', 'congelador', { generic: true, freezerCategory: 'carne' })
+    await prod('vaca', 'Vaca', 'congelador', { freezerCategory: 'carne', freezerLast: { amount: 3, unit: 'kg' } })
+    for (const [id, text, productId] of [['i1', 'Café', 'cafe'], ['i2', 'Leite', 'leite'], ['i3', 'Carne', 'carne']]) {
+      await adminDb.doc(`shopping/${id}`).set({ text, addedBy: 'ana', status: 'porComprar', productId })
+    }
+    const a = await login('ana')
+    const b = await login('rui')
+    const errors = []
+    a.page.on('pageerror', e => errors.push(e.message))
+    const base = a.page.url().split('#')[0]
+    for (const p of [a.page, b.page]) await p.goto(base + '#/compras')
+    await a.page.getByRole('button', { name: 'Café', exact: true }).waitFor({ timeout: 8000 })
+    await shot(a.page, 'ida-0-sem-viagem')
+
+    // 1. Ana starts at Lidl, Rui sees "No Lidl"
+    await a.page.getByRole('button', { name: 'Iniciar compras' }).click()
+    await a.page.getByRole('button', { name: 'Lidl', exact: true }).click()
+    await expectText(a.page, /No Lidl · 0 no carrinho/, 'Ana: No Lidl')
+    await expectText(b.page, /No Lidl/, 'Rui sees "No Lidl"')
+    await shot(a.page, 'ida-1-lidl')
+    await shot(b.page, 'ida-1-rui')
+
+    // 2. Café stays in place when ticked
+    await a.page.getByRole('button', { name: 'Café', exact: true }).click()
+    await expectText(a.page, /No Lidl · 1 no carrinho/, 'Café ticked, 1 in the cart')
+    await a.page.waitForTimeout(300)
+    await shot(a.page, 'ida-2-cafe')
+
+    // 3. Carne: 3 kg Vaca (pre-filled), then + outro Vazia 1 kg
+    await a.page.getByRole('button', { name: 'Carne', exact: true }).click()
+    await expectText(a.page, 'Carne — o que levas?', 'meat card opens')
+    await shot(a.page, 'ida-3a-carne')
+    await a.page.getByRole('button', { name: 'Pôr no carrinho' }).click()
+    await a.page.getByRole('button', { name: 'Carne', exact: true }).click()
+    await a.page.getByRole('button', { name: '+ outro' }).click()
+    await a.page.getByLabel('Nome do tipo').fill('Vazia')
+    await a.page.getByLabel('Quantidade', { exact: true }).fill('1')
+    await shot(a.page, 'ida-3b-carne-outro')
+    await a.page.getByRole('button', { name: 'Pôr no carrinho' }).click()
+    await expectText(a.page, 'Já levas: 3 kg Vaca · 1 kg Vazia', 'Já levas: 3 kg Vaca · 1 kg Vazia')
+    await shot(a.page, 'ida-3c-ja-levas')
+
+    // 4. change store to Continente, tick Leite
+    await a.page.getByRole('button', { name: 'Mudar de loja' }).click()
+    await a.page.getByRole('button', { name: 'Continente', exact: true }).click()
+    await expectText(a.page, /No Continente/, 'now at Continente')
+    await a.page.getByRole('button', { name: 'Leite', exact: true }).click()
+    await expectText(a.page, /No Continente · 3 no carrinho/, 'Leite ticked at Continente')
+    await shot(a.page, 'ida-4-continente')
+
+    // 5. Terminar: freezer card with Vaca 3 and Vazia 1
+    await a.page.getByRole('button', { name: /Terminar compras/ }).click()
+    await expectText(a.page, 'Para o congelador', 'freezer card')
+    const qty = async name => await a.page.getByLabel(`Quantidade de ${name}`).inputValue()
+    if (await qty('Vaca') !== '3') throw new Error(`Vaca should be 3, is ${await qty('Vaca')}`)
+    if (await qty('Vazia') !== '1') throw new Error(`Vazia should be 1, is ${await qty('Vazia')}`)
+    console.log('ok: freezer card shows Vaca 3 and Vazia 1')
+    await shot(a.page, 'ida-5-congelador')
+    await a.page.getByRole('button', { name: 'Guardar' }).click()
+
+    // 6. one "quanto foi?" per store
+    await expectText(a.page, 'Lidl — quanto foi?', 'Lidl — quanto foi?')
+    await shot(a.page, 'ida-6a-lidl')
+    await a.page.getByPlaceholder('Valor (ex.: 47,30)').fill('20')
+    await a.page.getByRole('button', { name: 'Registar', exact: true }).click()
+    await expectText(a.page, 'Continente — quanto foi?', 'Continente — quanto foi?')
+    await a.page.getByPlaceholder('Valor (ex.: 47,30)').fill('10')
+    await a.page.getByRole('button', { name: 'Registar', exact: true }).click()
+    await expectText(a.page, 'Nada por comprar', 'list empty after finishing')
+
+    // 7. Gastos shows both stores
+    await a.page.goto(base + '#/mais/gastos')
+    await expectText(a.page, /Lidl/, 'Gastos shows Lidl')
+    await expectText(a.page, /Continente/, 'Gastos shows Continente')
+    await shot(a.page, 'ida-7-gastos')
+    if (errors.length) throw new Error(`page errors: ${errors.join(' | ')}`)
+  },
+
   // Task 10: register 4 bags, take some out, undo, last bag → offer to add to the list.
   async congelador({ login, shot, expectText }) {
     await (await import('./ui-admin.mjs')).resetDb()
