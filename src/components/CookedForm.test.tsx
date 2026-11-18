@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import CookedForm from './CookedForm'
 
-const props = { origin: 'Vaca 1 kg', names: ['Sopa da Ana'], onSave: vi.fn(), onNothing: vi.fn() }
+const props = { origin: 'Vaca 1 kg', names: ['Sopa da Ana'], onSave: vi.fn(), onNothing: vi.fn(), onCancel: vi.fn() }
 beforeEach(() => vi.clearAllMocks())
 const type = (label: string, v: string) => fireEvent.change(screen.getByLabelText(label), { target: { value: v } })
 
@@ -43,4 +43,13 @@ test('Não guardámos nada calls onNothing', () => {
   render(<CookedForm {...props} />)
   fireEvent.click(screen.getByRole('button', { name: 'Não guardámos nada' }))
   expect(props.onNothing).toHaveBeenCalled()
+})
+
+test('Escape and Cancelar call onCancel and never onNothing', () => {
+  render(<CookedForm {...props} />)
+  fireEvent.keyDown(screen.getByLabelText('O que fizeste'), { key: 'Escape' })
+  expect(props.onCancel).toHaveBeenCalledTimes(1)
+  fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+  expect(props.onCancel).toHaveBeenCalledTimes(2)
+  expect(props.onNothing).not.toHaveBeenCalled()
 })

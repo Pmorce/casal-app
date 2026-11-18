@@ -176,9 +176,20 @@ test("addFromOrigin 'comprei': the bag, a purchase row with amount, unit and sto
   expect(typeof row.finishId).toBe('string')
   expect(Object.values(row)).not.toContain(undefined)
   expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'products/v' }),
-    { boughtKeys: ['2026-10-01', '2026-11-18'], freezerLast: { amount: 3, unit: 'kg', key: '2026-11-18' } })
+    { boughtKeys: ['2026-10-01', '2026-11-18'], freezerLast: { amount: 3, unit: 'kg', key: '2026-11-18' }, snoozedUntil: 'DEL', snoozeCount: 'DEL' })
   expect(done.purchaseId).toBe((purchaseWrites()[0][0] as { id: string }).id)
   expect(done.previous).toEqual({ id: 'v', boughtKeys: ['2026-10-01'] })
+})
+
+test("addFromOrigin 'comprei' clears the back-off and undo puts it back", () => {
+  const v = prod({ id: 'v', name: 'Vaca', location: 'congelador', snoozedUntil: '2026-12-01', snoozeCount: 2 })
+  const g = groupBags([bag({ name: 'Vaca', amount: 1, unit: 'kg', productId: 'v' })])[0]
+  const done = addFromOrigin(g, 'comprei', 3, '2026-11-18', { uid: 'P', product: v })
+  expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'products/v' }), expect.objectContaining({ snoozedUntil: 'DEL', snoozeCount: 'DEL' }))
+  expect(done.previous).toEqual(expect.objectContaining({ snoozedUntil: '2026-12-01', snoozeCount: 2 }))
+  fs.updateDoc.mockClear()
+  undoOrigin(done)
+  expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'products/v' }), expect.objectContaining({ snoozedUntil: '2026-12-01', snoozeCount: 2 }))
 })
 
 test("addFromOrigin 'comprei' without store or product writes no undefined fields", () => {
@@ -225,7 +236,7 @@ test('undoOrigin deletes the bag and the purchase and puts the product back as i
   undoOrigin(done)
   expect(fs.deleteDoc).toHaveBeenCalledWith(expect.objectContaining({ path: `freezerBags/${done.bagId}` }))
   expect(fs.deleteDoc).toHaveBeenCalledWith(expect.objectContaining({ path: `purchases/${done.purchaseId}` }))
-  expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'products/v' }), { boughtKeys: 'DEL', freezerLast: 'DEL' })
+  expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'products/v' }), { boughtKeys: 'DEL', freezerLast: 'DEL', snoozedUntil: 'DEL', snoozeCount: 'DEL' })
 })
 
 test('cook: 4 for the freezer and 2 for the fridge make two feita bags and delete the source', () => {

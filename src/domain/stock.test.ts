@@ -38,6 +38,7 @@ test('porContar lists by zone then name, skipping counted, uncounted and congela
     prod({ name: 'Leite', location: 'despensa', count: 2 }),
     prod({ name: 'Gelado', location: 'congelador' }),
     prod({ name: 'Lixívia', location: 'limpeza' }),
+    prod({ name: 'Carne', location: 'frigorifico', generic: true }),
   ])
   expect(list.map(p => p.name)).toEqual(['Iogurtes', 'Arroz', 'Lixívia'])
 })

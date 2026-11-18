@@ -62,6 +62,7 @@ test('Rui sees "Para comer primeiro" for fridge bags of 3 days or more', () => {
   data.bags = [bag({ id: 'x', where: 'frigorifico', movedKey: '2026-10-26' }), bag({ id: 'y', where: 'frigorifico', movedKey: '2026-10-28' })]
   renderHoje()
   expect(screen.getByText(/Para comer primeiro: 1/)).toBeTruthy()
+  expect(screen.getByText(/Para comer primeiro: 1/).closest('a')?.getAttribute('href')).toBe('/casa?tab=frigorifico')
 })
 
 test('Ana is asked to count the house with 28 por contar; Agora não hides it', () => {

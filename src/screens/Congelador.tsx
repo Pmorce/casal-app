@@ -188,7 +188,7 @@ export default function Congelador() {
                   onSave={(from, amount, store) => origin(g, from, amount, store)} onCancel={() => setSheet(null)} />
               )}
               {cooking?.group.key === g.key && (
-                <CookedForm origin={madeFromOf(cooking.bag)} names={names} onSave={cooked} onNothing={cookedNothing} />
+                <CookedForm origin={madeFromOf(cooking.bag)} names={names} onSave={cooked} onNothing={cookedNothing} onCancel={() => setCooking(null)} />
               )}
               {open === g.key && (
                 <div className="bags">

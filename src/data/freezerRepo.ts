@@ -69,7 +69,7 @@ export interface FromOrigin {
   /** 'comprei' only */
   purchaseId?: string
   /** 'comprei' with a product: its fields as they were, for undo */
-  previous?: Pick<Product, 'id' | 'boughtKeys' | 'freezerLast'>
+  previous?: Pick<Product, 'id' | 'boughtKeys' | 'freezerLast' | 'snoozedUntil' | 'snoozeCount'>
 }
 
 /**
@@ -100,9 +100,12 @@ export function addFromOrigin(
   if (!product) return { bagId: ref.id, purchaseId: purchase.id }
   fire(updateDoc(doc(db, 'products', product.id), {
     boughtKeys: recordPurchase(product.boughtKeys, today), freezerLast: { amount, unit: last.unit, key: today },
+    // a real purchase ends any "ainda há" back-off, like "Comprei" in Casa
+    snoozedUntil: deleteField(), snoozeCount: deleteField(),
   }), { quiet: true })
   const previous: FromOrigin['previous'] = {
     id: product.id, ...(product.boughtKeys ? { boughtKeys: product.boughtKeys } : {}), ...(product.freezerLast ? { freezerLast: product.freezerLast } : {}),
+    ...(product.snoozedUntil ? { snoozedUntil: product.snoozedUntil } : {}), ...(product.snoozeCount ? { snoozeCount: product.snoozeCount } : {}),
   }
   return { bagId: ref.id, purchaseId: purchase.id, previous }
 }
@@ -114,6 +117,7 @@ export function undoOrigin(done: FromOrigin): void {
   if (p) {
     fire(updateDoc(doc(db, 'products', p.id), {
       boughtKeys: p.boughtKeys ?? deleteField(), freezerLast: p.freezerLast ?? deleteField(),
+      snoozedUntil: p.snoozedUntil ?? deleteField(), snoozeCount: p.snoozeCount ?? deleteField(),
     }), { quiet: true })
   }
 }

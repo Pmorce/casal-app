@@ -4,7 +4,7 @@ import { useCollection } from '../data/useCollection'
 import { useSession } from '../data/session'
 import { useToday } from '../hooks/useToday'
 import { addProduct, boughtOutside, deleteProduct, markMissing, moveProduct, renameProduct, setFreezerCategory, snooze, undoBought, unmakeGeneric } from '../data/shoppingRepo'
-import { changeCount, setCount, setLastQty, setPurchaseQty, setUncounted } from '../data/stockRepo'
+import { changeCount, clearQtyPending, markQtyPending, setCount, setLastQty, setPurchaseQty, setUncounted } from '../data/stockRepo'
 import { restore } from '../data/restore'
 import { checkRename } from '../domain/pantry'
 import { MAX_SNOOZES, rhythmOf, shownGap, stockStatus, type StockStatus } from '../domain/rhythm'
@@ -33,6 +33,8 @@ const ZONE_TONE: Record<Zone, Tone> = { frigorifico: 'ceu', congelador: 'ceu', d
 // Casa is arranged by place; the freezer has its own screen (spec §5.1)
 const TABS = ZONES.filter(z => COUNTED_ZONES.includes(z.value))
 const TAB_KEY = 'casa.tab'
+// how long a tapped count is trusted over the snapshot (it normally catches up in tens of ms)
+const OPTIMISTIC_MS = 3000
 const byName = (list: Product[]) => [...list].sort((a, b) => a.name.localeCompare(b.name, 'pt-PT'))
 
 /** The tab chosen last time on this phone; anything else falls back to Frigorífico. */
@@ -114,7 +116,11 @@ export default function Casa() {
   const bags = unlinkOrphans(useCollection<FreezerBag>('freezerBags'), products)
   const [tab, setTab] = useState<Zone>(savedTab)
   // from Hoje: "Faltam quantidades de N produtos" opens the tab holding them and marks the rows
-  const highlight = useSearchParams()[0].get('pendentes') === '1'
+  const params = useSearchParams()[0]
+  const highlight = params.get('pendentes') === '1'
+  // from Hoje: "Para comer primeiro" opens the Frigorífico tab, where that card lives
+  const wantedTab = params.get('tab')
+  const openedTab = useRef(false)
   const openedPending = useRef(false)
   const [name, setName] = useState('')
   const [location, setLocation] = useState<Zone>(tab)
@@ -130,6 +136,19 @@ export default function Casa() {
   // an offer like "Pôr na lista" can stay open a while: it reads the list as it is when tapped
   const itemsRef = useRef(items)
   useEffect(() => { itemsRef.current = items }, [items])
+  // quick taps on "−"/"+" can come before the snapshot with the previous tap: the count they left, per product
+  const optimistic = useRef<Record<string, { n: number; at: number }>>({})
+  useEffect(() => {
+    for (const p of products) {
+      const o = optimistic.current[p.id]
+      if (o && (shownCount(p) === o.n || Date.now() - o.at > OPTIMISTIC_MS)) delete optimistic.current[p.id]
+    }
+  }, [products])
+  const countOf = (p: Product): number => {
+    const o = optimistic.current[p.id]
+    return o && Date.now() - o.at <= OPTIMISTIC_MS ? o.n : shownCount(p)
+  }
+  const leave = (p: Product, n: number) => { optimistic.current[p.id] = { n, at: Date.now() } }
 
   useEffect(() => {
     if (!highlight || openedPending.current) return
@@ -139,6 +158,13 @@ export default function Casa() {
     setTab(first)
     setLocation(first)
   }, [highlight, products])
+
+  useEffect(() => {
+    if (openedTab.current || highlight || !wantedTab || !COUNTED_ZONES.includes(wantedTab as Zone)) return
+    openedTab.current = true
+    setTab(wantedTab as Zone)
+    setLocation(wantedTab as Zone)
+  }, [wantedTab, highlight])
 
   function chooseTab(z: Zone) {
     setTab(z)
@@ -189,11 +215,13 @@ export default function Casa() {
     const done = boughtOutside(p, items, today, uid)
     changeCount(p, n)
     if (learned) setLastQty(p, n)
+    // the units are in now, so "falta pôr a quantidade" no longer holds
+    if (p.qtyPending) clearQtyPending(p)
     setPurchaseQty(done.purchaseId, n)
     setSpentFor(null)
     setUndo({
       message: `«${p.name}» comprado (+${n})`,
-      run: () => { undoBought(done); changeCount(p, -n) },
+      run: () => { undoBought(done); changeCount(p, -n); if (p.qtyPending) markQtyPending([p]) },
       action: spentOffer(p),
     })
   }
@@ -207,9 +235,11 @@ export default function Casa() {
 
   // one tap, no question; reaching 0 offers the list (spec §5.2)
   function minus(p: Product) {
-    const n = shownCount(p)
+    const n = countOf(p)
+    if (n <= 0) return
     changeCount(p, -1)
-    const back = () => changeCount(p, 1)
+    leave(p, n - 1)
+    const back = () => { changeCount(p, 1); leave(p, countOf(p) + 1) }
     if (n > 1) return setUndo({ message: `«${p.name}»: agora ${n - 1}`, run: back })
     const onList = items.some(i => i.productId === p.id)
     setUndo({
@@ -221,9 +251,10 @@ export default function Casa() {
 
   function plus(p: Product) {
     if (!isCounted(p)) return setAsk({ id: p.id, kind: 'ha' })
-    const n = shownCount(p)
+    const n = countOf(p)
     changeCount(p, 1)
-    setUndo({ message: `«${p.name}»: agora ${n + 1}`, run: () => changeCount(p, -1) })
+    leave(p, n + 1)
+    setUndo({ message: `«${p.name}»: agora ${n + 1}`, run: () => { changeCount(p, -1); leave(p, Math.max(0, countOf(p) - 1)) } })
   }
 
   function answer(p: Product, a: Ask, n: number) {

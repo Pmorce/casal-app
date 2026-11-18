@@ -248,7 +248,8 @@ export default function Compras() {
                   <div className="note">{m.reason === 'acabou' ? 'acabou em casa' : m.reason === 'congelador' ? 'não há no congelador' : `costuma durar ~${shownGap(m.gap)} dias · vai em ${m.since}`}</div>
                 </div>
                 <div className="product-actions">
-                  <button className="chip quiet" aria-label={`Ainda há ${m.product.name}`} onClick={() => snooze(m.product, today)}>Ainda há</button>
+                  {/* a counted product that ran out has its number instead: "Ainda há" would change nothing (spec §5.6) */}
+                  {m.reason !== 'acabou' && <button className="chip quiet" aria-label={`Ainda há ${m.product.name}`} onClick={() => snooze(m.product, today)}>Ainda há</button>}
                   <button className="chip" aria-label={`Falta ${m.product.name}`} onClick={() => markMissing(m.product, uid, items)}>Falta</button>
                 </div>
               </div>

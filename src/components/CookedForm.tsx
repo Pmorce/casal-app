@@ -15,11 +15,13 @@ function doses(s: string): number | null {
 }
 
 /** "Cozinhei" (spec §5.5): what was made and how many doses went to the freezer and to the fridge. */
-export default function CookedForm({ origin, names, onSave, onNothing }: {
+export default function CookedForm({ origin, names, onSave, onNothing, onCancel }: {
   origin?: string
   names: string[]
   onSave: (input: CookedInput) => void
   onNothing: () => void
+  /** closes the form and keeps the bag (Escape, "Cancelar") */
+  onCancel: () => void
 }) {
   const listId = useId()
   const [name, setName] = useState('')
@@ -36,7 +38,7 @@ export default function CookedForm({ origin, names, onSave, onNothing }: {
   }
 
   return (
-    <form className="bag-form sheet" onSubmit={save} onKeyDown={e => { if (e.key === 'Escape') onNothing() }}>
+    <form className="bag-form sheet" onSubmit={save} onKeyDown={e => { if (e.key === 'Escape') onCancel() }}>
       <h3 className="card-title">{origin ? `Cozinhei com ${origin}` : 'Cozinhei'}</h3>
       <p className="note">Guardaste alguma coisa?</p>
       <div className="bag-form-row">
@@ -59,6 +61,7 @@ export default function CookedForm({ origin, names, onSave, onNothing }: {
         </span>
       </div>
       <div className="form-actions">
+        <button type="button" className="link-btn" onClick={onCancel}>Cancelar</button>
         <button type="button" className="link-btn" onClick={onNothing}>Não guardámos nada</button>
         <button className="btn primary small" disabled={!ok}>Guardar</button>
       </div>

@@ -458,12 +458,15 @@ export default {
     console.log('ok: Casa shows Kefir 4')
     await shot(a.page, 'inv-1c-casa-kefir-4')
 
-    // 2. "−" four times: "Acabaram os Kefir" -> "Pôr na lista" -> Kefir on the list
-    for (let i = 3; i >= 0; i--) {
-      await a.page.getByRole('button', { name: 'Menos Kefir' }).click()
-      await a.page.getByRole('button', { name: `Kefir: ${i}, mudar` }).waitFor({ timeout: 8000 })
-    }
-    await expectText(a.page, 'Acabaram os Kefir', 'toast Acabaram os Kefir')
+    // 2. "−" once (4 -> 3), then three taps with NO waits in between: the toast must still say "Acabaram os Kefir"
+    await a.page.getByRole('button', { name: 'Menos Kefir' }).click()
+    await a.page.getByRole('button', { name: 'Kefir: 3, mudar' }).waitFor({ timeout: 8000 })
+    const minusKefir = a.page.getByRole('button', { name: 'Menos Kefir' })
+    for (let i = 0; i < 3; i++) await minusKefir.click({ timeout: 8000 })
+    await waitCount('kefir', 0)
+    await expectText(a.page, 'Acabaram os Kefir', 'toast Acabaram os Kefir after rapid taps')
+    await a.page.getByRole('button', { name: 'Pôr na lista' }).waitFor({ timeout: 8000 })
+    console.log('ok: Pôr na lista offered after rapid taps')
     await shot(a.page, 'inv-2-acabaram')
     await a.page.getByRole('button', { name: 'Pôr na lista' }).click()
     await a.page.goto(base + '#/compras')

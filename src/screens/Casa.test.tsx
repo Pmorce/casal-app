@@ -20,7 +20,7 @@ vi.mock('../data/shoppingRepo', () => repo)
 vi.mock('../data/restore', () => ({ restore: vi.fn() }))
 const exp = vi.hoisted(() => ({ addExpense: vi.fn() }))
 vi.mock('../data/expensesRepo', () => exp)
-const stock = vi.hoisted(() => ({ changeCount: vi.fn(), setCount: vi.fn(), setUncounted: vi.fn(), setLastQty: vi.fn(), setPurchaseQty: vi.fn() }))
+const stock = vi.hoisted(() => ({ changeCount: vi.fn(), setCount: vi.fn(), setUncounted: vi.fn(), setLastQty: vi.fn(), setPurchaseQty: vi.fn(), clearQtyPending: vi.fn(), markQtyPending: vi.fn() }))
 vi.mock('../data/stockRepo', () => stock)
 vi.mock('../data/freezerRepo', () => ({
   cook: vi.fn(), undoCook: vi.fn(), useDose: vi.fn(), deleteBag: vi.fn(), restoreBag: vi.fn(), backToFreezer: vi.fn(), moveToFridge: vi.fn(), updateBag: vi.fn(),
@@ -175,6 +175,48 @@ test('"−" on Iogurtes 1 says "Acabaram os Iogurtes" and "Pôr na lista" puts t
   expect(screen.getByText('Acabaram os Iogurtes')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'Pôr na lista' }))
   expect(repo.markMissing).toHaveBeenCalledWith(expect.objectContaining({ id: 'i' }), 'P', [])
+})
+
+test('Ana taps "−" three times fast on Iogurtes 3: the toast follows and ends on "Acabaram os Iogurtes"', () => {
+  data.products = [fridge({ id: 'i', name: 'Iogurtes', count: 3 })]
+  renderIt('Frigorífico')
+  const minus = screen.getByRole('button', { name: 'Menos Iogurtes' })
+  fireEvent.click(minus)
+  expect(screen.getByText('«Iogurtes»: agora 2')).toBeTruthy()
+  fireEvent.click(minus)
+  expect(screen.getByText('«Iogurtes»: agora 1')).toBeTruthy()
+  fireEvent.click(minus)
+  expect(screen.getByText('Acabaram os Iogurtes')).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'Pôr na lista' })).toBeTruthy()
+  expect(stock.changeCount).toHaveBeenCalledTimes(3)
+})
+
+test('Rui keeps tapping "−" on Iogurtes 1 before the screen updates: nothing is written below 0', () => {
+  data.products = [fridge({ id: 'i', name: 'Iogurtes', count: 1 })]
+  renderIt('Frigorífico')
+  const minus = screen.getByRole('button', { name: 'Menos Iogurtes' })
+  fireEvent.click(minus)
+  fireEvent.click(minus)
+  fireEvent.click(minus)
+  expect(stock.changeCount).toHaveBeenCalledTimes(1)
+  expect(screen.getByText('Acabaram os Iogurtes')).toBeTruthy()
+})
+
+test('"Comprei" on a product with a pending quantity clears it; Desfazer puts it back', () => {
+  data.products = [fridge({ id: 'i', name: 'Iogurtes', count: 0, qtyPending: true, lastQty: 6 })]
+  renderIt('Frigorífico')
+  fireEvent.click(screen.getByRole('button', { name: 'Mais ações de Iogurtes' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Comprei Iogurtes' }))
+  expect(stock.clearQtyPending).toHaveBeenCalledWith(expect.objectContaining({ id: 'i' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Desfazer' }))
+  expect(stock.markQtyPending).toHaveBeenCalledWith([expect.objectContaining({ id: 'i' })])
+})
+
+test('with ?tab=frigorifico Casa opens the Frigorífico tab even if Despensa was saved', () => {
+  localStorage.setItem('casa.tab', 'despensa')
+  data.products = [fridge({ id: 'i', name: 'Iogurtes', count: 2 })]
+  render(<MemoryRouter initialEntries={['/casa?tab=frigorifico']}><Casa /></MemoryRouter>)
+  expect(screen.getByRole('tab', { name: 'Frigorífico' }).getAttribute('aria-selected')).toBe('true')
 })
 
 test('when it is already on the list the toast only says "Acabaram os Iogurtes"', () => {

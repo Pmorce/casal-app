@@ -12,10 +12,10 @@ export const isCounted = (p: Product): boolean =>
 /** Never shown below 0. */
 export const shownCount = (p: Product): number => Math.max(0, p.count ?? 0)
 
-/** Products still "por contar": in a counted zone, no count yet and not opted out; by zone, then name. */
+/** Products still "por contar": in a counted zone, no count yet, not opted out and not generic (Casa hides those); by zone, then name. */
 export function porContar(products: Product[]): Product[] {
   return products
-    .filter(p => COUNTED_ZONES.includes(p.location) && p.count === undefined && !p.uncounted)
+    .filter(p => COUNTED_ZONES.includes(p.location) && p.count === undefined && !p.uncounted && !p.generic)
     .sort((a, b) =>
       COUNTED_ZONES.indexOf(a.location) - COUNTED_ZONES.indexOf(b.location) || a.name.localeCompare(b.name, 'pt-PT'))
 }

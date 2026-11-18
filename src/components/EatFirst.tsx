@@ -53,11 +53,11 @@ export default function EatFirst({ bags, today, names, onUndo }: {
           return (
             <div className="row" key={b.id}>
               <div className="grow">
-                <strong className="product-name">{b.name}</strong>
-                <span className="note">
+                <div className="product-name">{b.name}</div>
+                <div className="note">
                   comida feita · no frigorífico há {days} {days === 1 ? 'dia' : 'dias'}
                   {b.madeFrom ? ` · feito a ${ddmm(b.addedKey)} com ${b.madeFrom}` : ''}
-                </span>
+                </div>
                 {days >= FRIDGE_WARN_DAYS && <span className="old-tag"><Icon name="relogio" />{days} dias<span className="sr-only">come primeiro</span></span>}
               </div>
               <span className="stepper">
@@ -76,10 +76,10 @@ export default function EatFirst({ bags, today, names, onUndo }: {
           <div key={b.id}>
             <div className="row">
               <div className="grow">
-                <strong className="product-name">{b.name} {amount}</strong>
-                <span className="note">a descongelar desde {since(b.movedKey ?? b.addedKey, today)}</span>
+                <div className="product-name">{b.name} {amount}</div>
+                <div className="note">a descongelar desde {since(b.movedKey ?? b.addedKey, today)}</div>
               </div>
-              <button className="chip" aria-label={`Cozinhei ${b.name}`} onClick={() => { setMenu(null); setCooking(b.id) }}>Cozinhei</button>
+              <button className="chip" aria-label={`Cozinhei ${b.name}`} onClick={() => { setMenu(null); setCooking(cooking === b.id ? null : b.id) }}>Cozinhei</button>
               <button className="chip quiet" aria-label={`Mais opções de ${b.name}`} aria-expanded={menu === b.id}
                 onClick={() => { setCooking(null); setMenu(menu === b.id ? null : b.id) }}>Mais</button>
             </div>
@@ -94,7 +94,7 @@ export default function EatFirst({ bags, today, names, onUndo }: {
               </div>
             )}
             {cooking === b.id && (
-              <CookedForm origin={madeFromOf(b)} names={names} onSave={input => cooked(b, input)} onNothing={() => nothing(b)} />
+              <CookedForm origin={madeFromOf(b)} names={names} onSave={input => cooked(b, input)} onNothing={() => nothing(b)} onCancel={() => setCooking(null)} />
             )}
           </div>
         )

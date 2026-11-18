@@ -57,6 +57,18 @@ test('Cozinhei opens the form with the origin; Guardar cooks from that bag, with
   expect(repo.undoCook).toHaveBeenCalledWith({ bagIds: ['n1'] })
 })
 
+test('Cancelar closes the Cozinhei form and keeps the bag; Cozinhei toggles it', () => {
+  show()
+  fireEvent.click(screen.getByRole('button', { name: 'Cozinhei Vaca' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+  expect(screen.queryByText('Cozinhei com Vaca 1 kg')).toBeNull()
+  expect(repo.deleteBag).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Cozinhei Vaca' }))
+  expect(screen.getByText('Cozinhei com Vaca 1 kg')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Cozinhei Vaca' }))
+  expect(screen.queryByText('Cozinhei com Vaca 1 kg')).toBeNull()
+})
+
 test('Não guardámos nada takes the bag out, with undo', () => {
   show()
   fireEvent.click(screen.getByRole('button', { name: 'Cozinhei Vaca' }))

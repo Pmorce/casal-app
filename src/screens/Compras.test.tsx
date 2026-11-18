@@ -499,4 +499,6 @@ test('a counted product that ran out shows in Talvez falte as "acabou em casa"',
   data.shopping = []
   renderIt()
   expect(screen.getByText('acabou em casa')).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'Ainda há Leite' })).toBeNull()
+  expect(screen.getByRole('button', { name: 'Falta Leite' })).toBeTruthy()
 })

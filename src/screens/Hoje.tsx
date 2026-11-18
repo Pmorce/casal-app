@@ -70,7 +70,7 @@ export default function Hoje() {
           </Link>
         )}
         {eatFirst > 0 && (
-          <Link to="/casa" className="card freezer-link">
+          <Link to="/casa?tab=frigorifico" className="card freezer-link">
             <span className="grow">Para comer primeiro: {eatFirst}</span>
             <span className="chev"><Icon name="seta" size={18} /></span>
           </Link>

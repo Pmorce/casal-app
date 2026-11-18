@@ -339,3 +339,4 @@ h2 { font-size: 16px; font-weight: 800; margin: 18px 0 8px; }
 }
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .row.pending { background: var(--accent-soft); }
+.row.pending .note { color: var(--text); }

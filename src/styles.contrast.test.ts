@@ -39,6 +39,10 @@ describe.each([['light', light], ['dark', dark]] as const)('%s theme', (_, t) =>
     expect(contrast(t['--accent-ink'], t['--accent-soft'])).toBeGreaterThanOrEqual(4.5)
   })
 
+  test('the note of a pending row (--text) reads on accent-soft', () => {
+    expect(contrast(t['--text'], t['--accent-soft'])).toBeGreaterThanOrEqual(4.5)
+  })
+
   test('warnings and errors read on their backgrounds', () => {
     for (const bg of ['--bg', '--warn-soft']) expect(contrast(t['--warn'], t[bg]), `--warn on ${bg}`).toBeGreaterThanOrEqual(4.5)
     for (const bg of ['--bg', '--card', '--danger-soft']) expect(contrast(t['--danger'], t[bg]), `--danger on ${bg}`).toBeGreaterThanOrEqual(4.5)
