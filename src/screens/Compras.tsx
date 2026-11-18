@@ -222,7 +222,7 @@ export default function Compras() {
               <div className="row product" key={m.product.id}>
                 <div className="grow">
                   <div className="product-name">{m.product.name}</div>
-                  <div className="note">{m.reason === 'congelador' ? 'não há no congelador' : `costuma durar ~${shownGap(m.gap)} dias · vai em ${m.since}`}</div>
+                  <div className="note">{m.reason === 'acabou' ? 'acabou em casa' : m.reason === 'congelador' ? 'não há no congelador' : `costuma durar ~${shownGap(m.gap)} dias · vai em ${m.since}`}</div>
                 </div>
                 <div className="product-actions">
                   <button className="chip quiet" aria-label={`Ainda há ${m.product.name}`} onClick={() => snooze(m.product, today)}>Ainda há</button>

@@ -42,3 +42,23 @@ test('maybeMissing never lists a generic product without bags', () => {
   const carne = prod({ id: 'carne', name: 'Carne', location: 'congelador', generic: true, boughtKeys: ['2026-09-01', '2026-09-11', '2026-09-21'], freezerLast: { amount: 1, unit: 'kg', key: '2026-09-21' } })
   expect(maybeMissing([carne], [], '2026-10-29', [])).toEqual([])
 })
+
+test('a counted product that ran out is listed first, with the reason acabou', () => {
+  const out = prod({ id: 'o', name: 'Leite', count: 0 })
+  const late = prod({ id: 'l', name: 'Arroz', boughtKeys: ['2026-09-01', '2026-09-11', '2026-09-21'] })
+  const r = maybeMissing([late, out], [], '2026-11-18', [])
+  expect(r.map(m => [m.product.id, m.reason])).toEqual([['o', 'acabou'], ['l', 'ritmo']])
+})
+
+test('a counted product with stock is never listed by rhythm; pending quantity is not listed', () => {
+  const keys = ['2026-09-01', '2026-09-11', '2026-09-21']
+  expect(maybeMissing([prod({ count: 4, boughtKeys: keys })], [], '2026-11-18', [])).toEqual([])
+  expect(maybeMissing([prod({ count: 0, qtyPending: true, boughtKeys: keys })], [], '2026-11-18', [])).toEqual([])
+})
+
+test('Ana and Rui: a freezer product whose only bag is in the fridge is out of the freezer', () => {
+  const p = prod({ id: 'v', name: 'Bifes', location: 'congelador', boughtKeys: ['2026-10-01'], freezerLast: { amount: 1, unit: 'kg', key: '2026-10-01' } })
+  const inFridgeOnly = bag({ productId: 'v', where: 'frigorifico' })
+  expect(maybeMissing([p], [], '2026-11-18', [inFridgeOnly]).map(m => m.reason)).toEqual(['congelador'])
+  expect(maybeMissing([p], [], '2026-11-18', [bag({ productId: 'v' })])).toEqual([])
+})

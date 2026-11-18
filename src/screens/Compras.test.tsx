@@ -434,3 +434,10 @@ test('the freezer rows come from the plan: pre-filled from each part, tied to it
     expect.objectContaining({ amount: 1.5, unit: 'kg', purchaseId: 'pu2' }),
   ], '2026-10-29')
 })
+
+test('a counted product that ran out shows in Talvez falte as "acabou em casa"', () => {
+  data.products = [prod({ id: 'l', name: 'Leite', location: 'despensa', count: 0 })]
+  data.shopping = []
+  renderIt()
+  expect(screen.getByText('acabou em casa')).toBeTruthy()
+})

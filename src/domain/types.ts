@@ -46,6 +46,14 @@ export interface Product {
   generic?: true
   /** zone congelador only: amount of the last entry, to pre-fill the next one */
   freezerLast?: { amount: number; unit: FreezerUnit; key?: DateKey }
+  /** units/packs at home (integers); absent = "por contar", behaves as before. Never shown below 0 */
+  count?: number
+  /** units bought on the last trip, to pre-fill "O que entrou" */
+  lastQty?: number
+  /** "Não contar este": stays out of the counting */
+  uncounted?: true
+  /** bought, quantity not entered yet ("O que entrou"): not out meanwhile */
+  qtyPending?: true
 }
 
 export type FreezerUnit = 'un' | 'g' | 'kg' | 'doses'
@@ -60,6 +68,12 @@ export interface FreezerBag {
   addedKey: DateKey
   /** the Casa product it came from (bags from purchases); missing on hand-made and legacy bags */
   productId?: string
+  /** thawing in the fridge (absent = in the freezer) */
+  where?: 'frigorifico'
+  /** the day it went to the fridge */
+  movedKey?: DateKey
+  /** name of what it was cooked from (comida feita) */
+  madeFrom?: string
   createdAt?: unknown
 }
 

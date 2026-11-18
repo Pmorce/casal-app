@@ -1,4 +1,5 @@
 import { freezerDue, rhythmOf } from './rhythm'
+import { isCounted, shownCount } from './stock'
 import type { DateKey } from './dates'
 import type { FreezerBag, Product, ShoppingItem } from './types'
 
@@ -24,24 +25,29 @@ export function isOnList(text: string, items: ShoppingItem[]): boolean {
 export type MaybeMissing =
   | { product: Product; reason: 'ritmo'; gap: number; since: number }
   | { product: Product; reason: 'congelador' }
+  | { product: Product; reason: 'acabou' }
 
 /**
- * "Talvez falte", not on the list yet: Congelador products with no bags left first (counted, so surer),
+ * "Talvez falte", not on the list yet: counted products that ran out, then Congelador products with no bags left first (counted, so surer),
  * then products past their usual rhythm, most overdue first.
  */
 export function maybeMissing(products: Product[], items: ShoppingItem[], today: DateKey, bags: FreezerBag[]): MaybeMissing[] {
   const listed = new Set(items.flatMap(i => (i.productId ? [i.productId] : [])))
   const open = products.filter(p => !listed.has(p.id) && !p.generic)
+  const out: MaybeMissing[] = open
+    .filter(p => isCounted(p) && !p.qtyPending && shownCount(p) === 0)
+    .sort((a, b) => a.name.localeCompare(b.name, 'pt-PT'))
+    .map(product => ({ product, reason: 'acabou' }))
   const frozen: MaybeMissing[] = open
     .filter(p => freezerDue(p, bags, today))
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-PT'))
     .map(product => ({ product, reason: 'congelador' }))
   const late = open
-    .filter(p => p.location !== 'congelador')
+    .filter(p => p.location !== 'congelador' && !isCounted(p))
     .flatMap(p => {
       const r = rhythmOf(p, today)
       return r.due && r.gap !== null && r.since !== null ? [{ product: p, reason: 'ritmo' as const, gap: r.gap, since: r.since }] : []
     })
     .sort((a, b) => b.since / b.gap - a.since / a.gap)
-  return [...frozen, ...late]
+  return [...out, ...frozen, ...late]
 }

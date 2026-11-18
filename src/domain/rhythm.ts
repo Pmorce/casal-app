@@ -1,5 +1,6 @@
 import { addDays, daysBetween, type DateKey } from './dates'
 import { bagsOfProduct } from './freezer'
+import { countState } from './stock'
 import type { FreezerBag, Product, ShoppingItem } from './types'
 
 const KEEP = 8
@@ -69,6 +70,8 @@ export function snoozeUntil(p: Product, today: DateKey): DateKey {
 export type StockStatus = 'falta' | 'talvez' | 'ha'
 
 export function stockStatus(p: Product, items: ShoppingItem[], today: DateKey, bags: FreezerBag[]): StockStatus {
+  const counted = countState(p, items, today)
+  if (counted) return counted === 'acabou' ? 'talvez' : counted
   if (items.some(i => i.productId === p.id)) return 'falta'
   const due = p.location === 'congelador' ? freezerDue(p, bags, today) : rhythmOf(p, today).due
   return due ? 'talvez' : 'ha'

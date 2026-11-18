@@ -1,5 +1,6 @@
 import { daysBetween, type DateKey } from './dates'
 import { normalize } from './shopping'
+import { inFreezer } from './stock'
 import { freezerCategoryOf } from './zones'
 import type { FreezerBag, FreezerCategory, FreezerUnit, Product } from './types'
 
@@ -78,11 +79,11 @@ export function isOld(bag: FreezerBag, today: DateKey): boolean {
   return daysBetween(bag.addedKey, today) > OLD_AFTER_DAYS
 }
 
-/** A product's bags: the ones linked to it, plus legacy unlinked bags with its name in its freezer tab. */
+/** A product's bags in the freezer (not thawing in the fridge): the ones linked to it, plus legacy unlinked bags with its name in its freezer tab. */
 export function bagsOfProduct(p: Product, bags: FreezerBag[]): FreezerBag[] {
   const name = normalize(p.name)
   const category = freezerCategoryOf(p)
-  return bags.filter(b => b.productId === p.id || (!b.productId && b.category === category && normalize(b.name) === name))
+  return inFreezer(bags).filter(b => b.productId === p.id || (!b.productId && b.category === category && normalize(b.name) === name))
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100

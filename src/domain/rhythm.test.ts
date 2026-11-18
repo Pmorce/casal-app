@@ -1,4 +1,4 @@
-import { mergePurchases, recordPurchase, rhythmOf, shownGap, snoozeUntil, stockStatus, typicalGap } from './rhythm'
+import { freezerDue, mergePurchases, recordPurchase, rhythmOf, shownGap, snoozeUntil, stockStatus, typicalGap } from './rhythm'
 import { bag, item, prod } from './testFactories'
 
 test('recordPurchase keeps unique sorted dates, last 8', () => {
@@ -85,4 +85,24 @@ test('shownGap rounds the typical gap to whole days', () => {
 
 test('mergePurchases is the sorted union, last 8', () => {
   expect(mergePurchases(['2026-10-05'], ['2026-10-01', '2026-10-05'])).toEqual(['2026-10-01', '2026-10-05'])
+})
+
+test('stockStatus: counted products map acabou to talvez, keep falta and ha', () => {
+  expect(stockStatus(prod({ count: 0 }), [], '2026-11-18', [])).toBe('talvez')
+  expect(stockStatus(prod({ count: 0, qtyPending: true }), [], '2026-11-18', [])).toBe('ha')
+  expect(stockStatus(prod({ count: 2 }), [], '2026-11-18', [])).toBe('ha')
+  const p = prod({ id: 'c', count: 2 })
+  expect(stockStatus(p, [item({ productId: 'c' })], '2026-11-18', [])).toBe('falta')
+})
+
+test('stockStatus: a counted product with stock is not talvez even past its rhythm', () => {
+  const p = prod({ count: 2, boughtKeys: ['2026-09-01', '2026-09-11', '2026-09-21'] })
+  expect(stockStatus(p, [], '2026-11-18', [])).toBe('ha')
+})
+
+test('freezerDue: a bag moved to the fridge no longer counts as in the freezer', () => {
+  const p = prod({ id: 'v', location: 'congelador', boughtKeys: ['2026-10-01'], freezerLast: { amount: 1, unit: 'kg', key: '2026-10-01' } })
+  expect(freezerDue(p, [], '2026-11-18')).toBe(true)
+  expect(freezerDue(p, [bag({ productId: 'v', where: 'frigorifico' })], '2026-11-18')).toBe(true)
+  expect(freezerDue(p, [bag({ productId: 'v' })], '2026-11-18')).toBe(false)
 })
