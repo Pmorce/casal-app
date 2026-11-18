@@ -62,7 +62,8 @@ test('Dividir 5 kg defaults to 5 bags of 1 kg, with undo', () => {
   data.bags = [b]
   renderIt()
   openSplit('Vaca')
-  expect(screen.getByText('sacos de 1 kg')).toBeTruthy()
+  expect((screen.getByLabelText('Saco 1 (kg)') as HTMLInputElement).value).toBe('1')
+  expect(screen.getByText('1 kg (o resto)')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'Dividir em 5' }))
   expect(freezer.splitBag).toHaveBeenCalledWith(b, [1, 1, 1, 1, 1])
   fireEvent.click(screen.getByRole('button', { name: 'Desfazer' }))
@@ -76,22 +77,38 @@ test('Dividir 1 kg in 3 keeps the total', () => {
   renderIt()
   openSplit('Vaca')
   fireEvent.click(screen.getByRole('button', { name: 'Mais sacos' }))
-  expect(screen.getByText('sacos de ~0,33 kg')).toBeTruthy()
+  expect((screen.getByLabelText('Saco 2 (kg)') as HTMLInputElement).value).toBe('0,33')
+  expect(screen.getByText('0,34 kg (o resto)')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'Dividir em 3' }))
   expect(freezer.splitBag).toHaveBeenCalledWith(b, [0.33, 0.33, 0.34])
 })
 
-test('Dividir never changes the total: 4 kg in 4 bags is 1 kg each, and there is no amount to type', () => {
-  const b = bag({ name: 'Porco', amount: 4, unit: 'kg' })
+test('Dividir in different weights: 3 kg as 1 kg + 0,6 kg, the last bag takes the rest (1,4 kg)', () => {
+  const b = bag({ name: 'Porco', amount: 3, unit: 'kg' })
   data.bags = [b]
   renderIt()
   openSplit('Porco')
-  expect(screen.queryByLabelText('Quantidade por saco')).toBeNull()
-  expect(screen.getByText('sacos de 1 kg')).toBeTruthy()
-  fireEvent.click(screen.getByRole('button', { name: 'Menos sacos' }))
-  expect(screen.getByText('sacos de ~1,33 kg')).toBeTruthy()
+  expect(screen.queryByLabelText('Saco 3 (kg)')).toBeNull()
+  fireEvent.change(screen.getByLabelText('Saco 1 (kg)'), { target: { value: '1' } })
+  fireEvent.change(screen.getByLabelText('Saco 2 (kg)'), { target: { value: '0,6' } })
+  expect(screen.getByText('1,4 kg (o resto)')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'Dividir em 3' }))
-  expect(freezer.splitBag).toHaveBeenCalledWith(b, [1.33, 1.33, 1.34])
+  expect(freezer.splitBag).toHaveBeenCalledWith(b, [1, 0.6, 1.4])
+})
+
+test('Dividir never goes over the total: the button turns off and says why', () => {
+  const b = bag({ name: 'Porco', amount: 3, unit: 'kg' })
+  data.bags = [b]
+  renderIt()
+  openSplit('Porco')
+  fireEvent.change(screen.getByLabelText('Saco 1 (kg)'), { target: { value: '2' } })
+  fireEvent.change(screen.getByLabelText('Saco 2 (kg)'), { target: { value: '1,5' } })
+  expect(screen.getByText('Passa do total (3 kg)')).toBeTruthy()
+  expect((screen.getByRole('button', { name: 'Dividir em 3' }) as HTMLButtonElement).disabled).toBe(true)
+  fireEvent.change(screen.getByLabelText('Saco 2 (kg)'), { target: { value: 'x' } })
+  expect(screen.getByText('Quantidade inválida')).toBeTruthy()
+  expect((screen.getByRole('button', { name: 'Dividir em 3' }) as HTMLButtonElement).disabled).toBe(true)
+  expect(freezer.splitBag).not.toHaveBeenCalled()
 })
 
 const lastBagOfVaca = () => {

@@ -304,6 +304,8 @@ h2 { font-size: 16px; font-weight: 800; margin: 18px 0 8px; }
 .bag-form-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .bag-form-row .input { flex: 1 1 90px; width: auto; min-width: 0; }
 .bag-amount { flex: 1 1 130px; display: flex; align-items: center; gap: 8px; }
+.split-row { margin-top: 6px; }
+.split-label { flex: 0 0 64px; font-size: 14px; color: var(--muted); }
 .form-actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 8px; }
 /* Para o congelador: one row per product, the amount beside the name and the units under it */
 .freeze-row { margin-bottom: 12px; }

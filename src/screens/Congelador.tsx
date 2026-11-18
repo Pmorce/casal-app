@@ -6,7 +6,7 @@ import { addSameAsLast, deleteBag, deleteBags, removeOldest, restoreBag, splitBa
 import { addItem, markMissing, snooze } from '../data/shoppingRepo'
 import { guessZone } from '../domain/zones'
 import { findProduct } from '../domain/shopping'
-import { CATEGORIES, groupBags, isOld, maxSplit, parseAmount, splitAmounts, summary, type FreezerGroup } from '../domain/freezer'
+import { CATEGORIES, groupBags, isOld, maxSplit, parseAmount, splitAmounts, splitWithRest, summary, type FreezerGroup } from '../domain/freezer'
 import { daysBetween, type DateKey } from '../domain/dates'
 import type { FreezerBag, Product, ShoppingItem } from '../domain/types'
 import UndoToast from '../components/UndoToast'
@@ -161,22 +161,34 @@ export default function Congelador() {
 }
 
 /**
- * "Dividir": when the pack is split at home. Only the number of bags is chosen: the total never changes
- * (a typed amount per bag once turned 4 kg into 8 kg). A bag that really weighs differently is fixed with "Corrigir".
+ * "Dividir": when the pack is split at home, in equal or different weights. Every bag but the last can be typed;
+ * the last one is always what is left, so the total never changes (a typed amount per bag once turned 4 kg into 8 kg).
  */
 function SplitBag({ bag, onSplit, onCancel }: { bag: FreezerBag; onSplit: (amounts: number[]) => void; onCancel: () => void }) {
   const most = maxSplit(bag.amount)
   const whole = Number.isInteger(bag.amount) && bag.amount > 1
   const [count, setCount] = useState(Math.min(most, whole ? bag.amount : 2))
+  // what was typed per bag (index → text); untouched bags show their equal share
+  const [typed, setTyped] = useState<Record<number, string>>({})
   const [error, setError] = useState('')
-  // equal parts in hundredths; the last bags take the rounding, so the total stays exact
-  const parts = splitAmounts(bag.amount, count)
-  const uneven = parts.some(p => p !== parts[0])
+  const unit = UNIT_LABEL[bag.unit]
+  const equal = splitAmounts(bag.amount, count)
+  const texts = equal.slice(0, -1).map((a, i) => typed[i] ?? ptNum(a))
+  const firsts = texts.map(parseAmount)
+  const invalid = firsts.some(a => a === null)
+  const amounts = invalid ? null : splitWithRest(bag.amount, firsts as number[])
+  const problem = invalid ? 'Quantidade inválida' : amounts ? '' : `Passa do total (${ptNum(bag.amount)} ${unit})`
+
+  function changeCount(n: number) {
+    setCount(n)
+    setTyped({}) // a new count starts again from equal shares
+  }
 
   function save(e: FormEvent) {
     e.preventDefault()
+    if (!amounts) return
     try {
-      onSplit(parts)
+      onSplit(amounts)
     } catch (err) {
       setError(`Não foi possível dividir: ${(err as Error).message}`)
     }
@@ -186,16 +198,30 @@ function SplitBag({ bag, onSplit, onCancel }: { bag: FreezerBag; onSplit: (amoun
     <form className="bag-form small" onSubmit={save}>
       <div className="bag-form-row">
         <span className="stepper">
-          <button type="button" aria-label="Menos sacos" onClick={() => setCount(Math.max(2, count - 1))}><Icon name="menos" /></button>
+          <button type="button" aria-label="Menos sacos" onClick={() => changeCount(Math.max(2, count - 1))}><Icon name="menos" /></button>
           <b aria-live="polite">{count}</b>
-          <button type="button" aria-label="Mais sacos" onClick={() => setCount(Math.min(most, count + 1))}><Icon name="mais1" /></button>
+          <button type="button" aria-label="Mais sacos" onClick={() => changeCount(Math.min(most, count + 1))}><Icon name="mais1" /></button>
         </span>
-        <span>sacos de {uneven ? '~' : ''}{ptNum(parts[0])} {UNIT_LABEL[bag.unit]}</span>
+        <span>sacos de {ptNum(bag.amount)} {unit} no total</span>
       </div>
-      {error && <p className="error">{error}</p>}
+      {texts.map((t, i) => (
+        <div className="bag-form-row split-row" key={i}>
+          <span className="split-label">Saco {i + 1}</span>
+          <span className="bag-amount">
+            <input className="input" inputMode="decimal" aria-label={`Saco ${i + 1} (${unit})`} value={t}
+              onChange={e => { setTyped(s => ({ ...s, [i]: e.target.value })); setError('') }} />
+            <span>{unit}</span>
+          </span>
+        </div>
+      ))}
+      <div className="bag-form-row split-row">
+        <span className="split-label">Saco {count}</span>
+        <span className="note">{amounts ? `${ptNum(amounts[amounts.length - 1])} ${unit} (o resto)` : '—'}</span>
+      </div>
+      {(problem || error) && <p className="error">{problem || error}</p>}
       <div className="form-actions">
         <button type="button" className="link-btn" onClick={onCancel}>Cancelar</button>
-        <button className="btn primary small">Dividir em {count}</button>
+        <button className="btn primary small" disabled={!amounts}>Dividir em {count}</button>
       </div>
     </form>
   )

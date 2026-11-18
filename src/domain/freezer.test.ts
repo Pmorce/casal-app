@@ -1,4 +1,4 @@
-import { parseAmount, summary, groupBags, oldestBag, isOld, bagsOfProduct, splitAmounts, freezeDefaults, unlinkOrphans, maxSplit } from './freezer'
+import { parseAmount, summary, groupBags, oldestBag, isOld, bagsOfProduct, splitAmounts, freezeDefaults, unlinkOrphans, maxSplit, splitWithRest } from './freezer'
 import { bag, item, prod } from './testFactories'
 
 const group = (bags: ReturnType<typeof bag>[]) => groupBags(bags)[0]
@@ -49,6 +49,13 @@ test('bagsOfProduct: linked bags, plus legacy bags with the same name in the sam
   const bags = [bag({ productId: 'p', name: 'Outro nome' }), bag({ name: ' arroz', category: 'outros' }),
     bag({ name: 'Arroz', category: 'feita' }), bag({ name: 'Arroz', category: 'outros', productId: 'x' })]
   expect(bagsOfProduct(p, bags)).toHaveLength(2)
+})
+
+test('splitWithRest: the last bag takes what is left, exact to the hundredth; nothing left is refused', () => {
+  expect(splitWithRest(3, [1, 0.6])).toEqual([1, 0.6, 1.4])
+  expect(splitWithRest(1, [0.33, 0.33])).toEqual([0.33, 0.33, 0.34])
+  expect(splitWithRest(3, [2, 1.5])).toBeNull()
+  expect(splitWithRest(2, [1, 1])).toBeNull()
 })
 
 test('splitAmounts keeps the total exact with 2 decimals', () => {

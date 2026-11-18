@@ -108,6 +108,15 @@ export function splitAmounts(total: number, count: number): number[] {
   return Array.from({ length: count }, (_, i) => (base + (i >= count - extra ? 1 : 0)) / 100)
 }
 
+/**
+ * "Dividir" in different weights: the typed bags as they are, and the last one takes what is left
+ * (in hundredths, so the total stays exact). Null when nothing would be left for the last bag.
+ */
+export function splitWithRest(total: number, firsts: number[]): number[] | null {
+  const rest = Math.round(total * 100) - firsts.reduce((s, a) => s + Math.round(a * 100), 0)
+  return rest > 0 ? [...firsts, rest / 100] : null
+}
+
 /** How many bags a bag can be split into: up to 20, and never less than 0,01 each. */
 export const maxSplit = (total: number): number => Math.min(20, Math.round(total * 100))
 
