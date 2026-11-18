@@ -3,14 +3,14 @@ import { useCollection } from '../data/useCollection'
 import { useSession } from '../data/session'
 import { useToday } from '../hooks/useToday'
 import {
-  addFromOrigin, backToFreezer, deleteBag, deleteBags, moveToFridge, removeOldest, restoreBag, splitBag, undoOrigin, updateBag,
+  addFromOrigin, backToFreezer, cook, deleteBag, deleteBags, moveToFridge, removeOldest, restoreBag, splitBag, undoCook, undoOrigin, updateBag,
 } from '../data/freezerRepo'
 import { addCustomStore } from '../data/tripRepo'
 import { addItem, markMissing, snooze } from '../data/shoppingRepo'
 import { guessZone } from '../domain/zones'
 import { findProduct } from '../domain/shopping'
 import {
-  CATEGORIES, groupBags, isOld, maxSplit, oldestBag, parseAmount, splitAmounts, splitWithRest, summary, type BagOrigin, type FreezerGroup,
+  CATEGORIES, groupBags, isOld, madeFromOf, maxSplit, oldestBag, parseAmount, splitAmounts, splitWithRest, summary, type BagOrigin, type FreezerGroup,
 } from '../domain/freezer'
 import { addDays, daysBetween, type DateKey } from '../domain/dates'
 import { inFreezer } from '../domain/stock'
@@ -20,6 +20,7 @@ import UndoToast from '../components/UndoToast'
 import PageHeader from '../components/PageHeader'
 import Icon, { Badge, type IconName, type Tone } from '../components/Icon'
 import WhereSheet, { type WhereTo } from '../components/WhereSheet'
+import CookedForm from '../components/CookedForm'
 import OriginSheet from '../components/OriginSheet'
 import NovoSaco from './NovoSaco'
 
@@ -65,6 +66,8 @@ export default function Congelador() {
   const [undo, setUndo] = useState<{ message: string; run: () => void; ended?: FreezerGroup } | null>(null)
   const [fixing, setFixing] = useState<string | null>(null)
   const [splitting, setSplitting] = useState<string | null>(null)
+  // "Cozinhar já": the bag stays until "Cozinhei" is answered (saved or nothing kept), so one undo covers all of it
+  const [cooking, setCooking] = useState<{ group: FreezerGroup; bag: FreezerBag; wasLast: boolean } | null>(null)
   // the group whose "−" or "+" asked its question; found again at render, so a group gone meanwhile closes it
   const [sheet, setSheet] = useState<{ kind: 'where' | 'origin'; key: string } | null>(null)
   const closeUndo = useCallback(() => setUndo(null), [])
@@ -87,17 +90,27 @@ export default function Congelador() {
       moveToFridge(bag, today)
       return left(g, wasLast, 'A descongelar no frigorífico', () => backToFreezer(bag))
     }
+    if (to === 'cozinhar') return setCooking({ group: g, bag: oldestBag(g), wasLast })
     const bag = removeOldest(g)
-    if (to === 'cozinhar') return cookNow(g, bag, wasLast)
     left(g, wasLast, 'Saco retirado', () => restoreBag(bag))
   }
 
-  /**
-   * "Cozinhar já": the bag is out. Hook for Task 6: open the CookedForm here with `madeFrom` from this bag, and
-   * show the last-bag "Acabou X" only after it closes (never two at once, spec §5.11). Until then it is like "Acabou".
-   */
-  function cookNow(g: FreezerGroup, bag: FreezerBag, wasLast: boolean) {
-    left(g, wasLast, 'Saco retirado', () => restoreBag(bag))
+  /** "Cozinhei" saved: the new bags go in and the source out; the last-bag "Acabou X" comes only now (never two at once, spec §5.11). */
+  function cooked(input: { name: string; freezerDoses: number; fridgeDoses: number }) {
+    if (!cooking) return
+    const { group, bag, wasLast } = cooking
+    setCooking(null)
+    const done = cook({ ...input, madeFrom: madeFromOf(bag) }, today, bag)
+    left(group, wasLast, 'Cozinhei', () => undoCook(done))
+  }
+
+  /** "Não guardámos nada": the bag is out, as with "Acabou". */
+  function cookedNothing() {
+    if (!cooking) return
+    const { group, bag, wasLast } = cooking
+    setCooking(null)
+    deleteBag(bag.id)
+    left(group, wasLast, 'Saco retirado', () => restoreBag(bag))
   }
 
   /** "De onde veio?": a new bag like the newest one; "Comprei" also records the purchase. */
@@ -173,6 +186,9 @@ export default function Congelador() {
                   stores={storeOptions(customStores(meta), purchases)}
                   onAddCustom={name => addCustomStore(name, customStores(meta))}
                   onSave={(from, amount, store) => origin(g, from, amount, store)} onCancel={() => setSheet(null)} />
+              )}
+              {cooking?.group.key === g.key && (
+                <CookedForm origin={madeFromOf(cooking.bag)} names={names} onSave={cooked} onNothing={cookedNothing} />
               )}
               {open === g.key && (
                 <div className="bags">

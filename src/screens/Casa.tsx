@@ -9,8 +9,9 @@ import { restore } from '../data/restore'
 import { checkRename } from '../domain/pantry'
 import { MAX_SNOOZES, rhythmOf, shownGap, stockStatus, type StockStatus } from '../domain/rhythm'
 import { unlinkOrphans } from '../domain/freezer'
-import { COUNTED_ZONES, countState, inFreezer, isCounted, shownCount, staleCount } from '../domain/stock'
+import { COUNTED_ZONES, countState, inFreezer, inFridge, isCounted, shownCount, staleCount } from '../domain/stock'
 import SpentForm from '../components/SpentForm'
+import EatFirst from '../components/EatFirst'
 import CountStepper from '../components/CountStepper'
 import QtyPrompt, { parseQty } from '../components/QtyPrompt'
 import { freezerCategoryOf, ZONES } from '../domain/zones'
@@ -269,7 +270,10 @@ export default function Casa() {
               ))}
             </div>
 
-            {/* Frigorífico: "Para comer primeiro" (spec §5.7) goes here, above the products */}
+            {tab === 'frigorifico' && (
+              <EatFirst bags={inFridge(bags)} today={today} names={[...new Set(bags.filter(b => b.category === 'feita').map(b => b.name))]}
+                onUndo={(message, run) => setUndo({ message, run })} />
+            )}
 
             <div className="card">
               <h2 className="state-title">Produtos</h2>

@@ -16,6 +16,7 @@ const freezer = vi.hoisted(() => ({
   removeOldest: vi.fn((g: { bags: FreezerBag[] }) => g.bags[0]),
   splitBag: vi.fn((_b: FreezerBag, amounts: number[]) => amounts.map((_, i) => `s${i}`)),
   deleteBags: vi.fn(),
+  cook: vi.fn(() => ({ bagIds: ['c1'] })), undoCook: vi.fn(),
   moveToFridge: vi.fn(), backToFreezer: vi.fn(), undoOrigin: vi.fn(),
   addFromOrigin: vi.fn(() => ({ bagId: 'nb' })),
 }))
@@ -306,11 +307,28 @@ test('"−" on the only bag → Descongelar: "Pôr na lista" puts the product on
   expect(shop.markMissing).toHaveBeenCalledWith(v, 'P', [])
 })
 
-test('"Cozinhar já" takes the bag out with undo, and the last one still asks for the list', () => {
+test('"Cozinhar já" opens Cozinhei with that bag; the last-bag question waits for it', () => {
+  data.bags = [bag({ name: 'Vaca', amount: 1, unit: 'kg' })]
+  renderIt()
+  takeOut('Vaca', 'Cozinhar já')
+  expect(freezer.removeOldest).not.toHaveBeenCalled()
+  expect(screen.getByText('Cozinhei com Vaca 1 kg')).toBeTruthy()
+  expect(screen.queryByText('Acabou Vaca')).toBeNull()
+  fireEvent.change(screen.getByLabelText('O que fizeste'), { target: { value: 'Estufado' } })
+  fireEvent.change(screen.getByLabelText('Para o congelador'), { target: { value: '4' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+  expect(freezer.cook).toHaveBeenCalledWith({ name: 'Estufado', freezerDoses: 4, fridgeDoses: 0, madeFrom: 'Vaca 1 kg' }, '2026-10-29', data.bags[0])
+  expect(screen.getByText('Acabou Vaca')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Desfazer' }))
+  expect(freezer.undoCook).toHaveBeenCalledWith({ bagIds: ['c1'] })
+})
+
+test('"Cozinhar já" → Não guardámos nada takes the bag out with undo, and the last one asks for the list', () => {
   data.bags = [bag({ name: 'Vaca' })]
   renderIt()
   takeOut('Vaca', 'Cozinhar já')
-  expect(freezer.removeOldest).toHaveBeenCalledTimes(1)
+  fireEvent.click(screen.getByRole('button', { name: 'Não guardámos nada' }))
+  expect(freezer.deleteBag).toHaveBeenCalledWith(data.bags[0].id)
   expect(screen.getByText('Acabou Vaca')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'Desfazer' }))
   expect(freezer.restoreBag).toHaveBeenCalled()

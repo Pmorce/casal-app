@@ -1,4 +1,4 @@
-import { addBags, addFromOrigin, addSameAsLast, backToFreezer, deleteBags, freezeBought, moveToFridge, removeOldest, splitBag, undoFreeze, undoOrigin } from './freezerRepo'
+import { addBags, addFromOrigin, addSameAsLast, backToFreezer, cook, deleteBags, undoCook, useDose as eatDose, freezeBought, moveToFridge, removeOldest, splitBag, undoFreeze, undoOrigin } from './freezerRepo'
 import { groupBags } from '../domain/freezer'
 import { bag, prod } from '../domain/testFactories'
 
@@ -226,4 +226,51 @@ test('undoOrigin deletes the bag and the purchase and puts the product back as i
   expect(fs.deleteDoc).toHaveBeenCalledWith(expect.objectContaining({ path: `freezerBags/${done.bagId}` }))
   expect(fs.deleteDoc).toHaveBeenCalledWith(expect.objectContaining({ path: `purchases/${done.purchaseId}` }))
   expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'products/v' }), { boughtKeys: 'DEL', freezerLast: 'DEL' })
+})
+
+test('cook: 4 for the freezer and 2 for the fridge make two feita bags and delete the source', () => {
+  const src = bag({ id: 'src', name: 'Vaca', amount: 1, unit: 'kg' })
+  const done = cook({ name: ' Arroz de vaca ', freezerDoses: 4, fridgeDoses: 2, madeFrom: 'Vaca 1 kg' }, '2026-11-18', src)
+  const writes = fs.setDoc.mock.calls.filter(c => (c[0] as { path: string }).path.startsWith('freezerBags/new'))
+  expect(writes).toHaveLength(2)
+  expect(writes[0][1]).toEqual(expect.objectContaining({ name: 'Arroz de vaca', category: 'feita', unit: 'doses', amount: 4, addedKey: '2026-11-18', madeFrom: 'Vaca 1 kg' }))
+  expect(writes[0][1]).not.toHaveProperty('where')
+  expect(writes[1][1]).toEqual(expect.objectContaining({ amount: 2, where: 'frigorifico', movedKey: '2026-11-18', madeFrom: 'Vaca 1 kg' }))
+  expect(fs.deleteDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'freezerBags/src' }))
+  expect(done.bagIds).toHaveLength(2)
+  expect(done.source).toBe(src)
+})
+
+test('cook: only the freezer field makes one bag, with no undefined fields', () => {
+  const done = cook({ name: 'Sopa', freezerDoses: 4, fridgeDoses: 0 }, '2026-11-18')
+  const writes = fs.setDoc.mock.calls.filter(c => (c[0] as { path: string }).path.startsWith('freezerBags/new'))
+  expect(writes).toHaveLength(1)
+  expect(Object.values(writes[0][1] as object)).not.toContain(undefined)
+  expect(writes[0][1]).not.toHaveProperty('madeFrom')
+  expect(done.bagIds).toHaveLength(1)
+  expect(fs.deleteDoc).not.toHaveBeenCalled()
+})
+
+test('cook rejects a blank name or no doses', () => {
+  expect(() => cook({ name: ' ', freezerDoses: 1, fridgeDoses: 0 }, '2026-11-18')).toThrow()
+  expect(() => cook({ name: 'Sopa', freezerDoses: 0, fridgeDoses: 0 }, '2026-11-18')).toThrow()
+})
+
+test('undoCook restores the source and deletes the new bags', () => {
+  const src = bag({ id: 'src', name: 'Vaca' })
+  const done = cook({ name: 'Sopa', freezerDoses: 2, fridgeDoses: 1 }, '2026-11-18', src)
+  vi.clearAllMocks()
+  undoCook(done)
+  expect(fs.setDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'freezerBags/src' }), expect.not.objectContaining({ id: 'src' }))
+  for (const id of done.bagIds) expect(fs.delete).toHaveBeenCalledWith(expect.objectContaining({ path: `freezerBags/${id}` }))
+})
+
+test('useDose takes one dose off a bag of doses, otherwise deletes the bag', () => {
+  const b = bag({ id: 'f', category: 'feita', unit: 'doses', amount: 3 })
+  expect(eatDose(b)).toBe(b)
+  expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'freezerBags/f' }), { amount: 2 })
+  eatDose(bag({ id: 'l', unit: 'doses', amount: 1 }))
+  eatDose(bag({ id: 'k', unit: 'kg', amount: 2 }))
+  expect(fs.deleteDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'freezerBags/l' }))
+  expect(fs.deleteDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'freezerBags/k' }))
 })

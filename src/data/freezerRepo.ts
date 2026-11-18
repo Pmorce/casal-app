@@ -205,3 +205,49 @@ export function deleteBags(ids: string[]): void {
   ids.forEach(id => batch.delete(doc(db, 'freezerBags', id)))
   fire(batch.commit())
 }
+
+export interface CookInput {
+  name: string
+  freezerDoses: number
+  fridgeDoses: number
+  madeFrom?: string
+}
+
+export interface Cooked {
+  bagIds: string[]
+  source?: FreezerBag
+}
+
+/**
+ * "Cozinhei": up to two comida feita bags (freezer and fridge), both entered today and tied to what they were cooked from.
+ * The source bag, if any, goes. A field with 0 doses makes no bag. One undo for all of it.
+ */
+export function cook(input: CookInput, today: DateKey, source?: FreezerBag): Cooked {
+  const name = cleanText(input.name)
+  if (!name) throw new Error('Nome em falta')
+  const { freezerDoses, fridgeDoses } = input
+  if (![freezerDoses, fridgeDoses].every(n => Number.isInteger(n) && n >= 0) || freezerDoses + fridgeDoses < 1) throw new Error('Doses inválidas')
+  const made = input.madeFrom ? { madeFrom: input.madeFrom } : {}
+  const make = (amount: number, extra: object) => {
+    const ref = newBagRef()
+    fire(setDoc(ref, { name, category: 'feita', amount, unit: 'doses', addedKey: today, createdAt: serverTimestamp(), ...made, ...extra }))
+    return ref.id
+  }
+  const bagIds: string[] = []
+  if (freezerDoses > 0) bagIds.push(make(freezerDoses, {}))
+  if (fridgeDoses > 0) bagIds.push(make(fridgeDoses, { where: 'frigorifico', movedKey: today }))
+  if (source) deleteBag(source.id)
+  return source ? { bagIds, source } : { bagIds }
+}
+
+export function undoCook(done: Cooked): void {
+  if (done.source) restoreBag(done.source)
+  deleteBags(done.bagIds)
+}
+
+/** "−" on comida feita: one dose less; the last dose (or a bag in another unit) takes the bag out. Returns it for undo. */
+export function useDose(b: FreezerBag): FreezerBag {
+  if (b.unit === 'doses' && b.amount > 1) fire(updateDoc(doc(db, 'freezerBags', b.id), { amount: b.amount - 1 }))
+  else deleteBag(b.id)
+  return b
+}

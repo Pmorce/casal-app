@@ -22,6 +22,9 @@ const exp = vi.hoisted(() => ({ addExpense: vi.fn() }))
 vi.mock('../data/expensesRepo', () => exp)
 const stock = vi.hoisted(() => ({ changeCount: vi.fn(), setCount: vi.fn(), setUncounted: vi.fn(), setLastQty: vi.fn(), setPurchaseQty: vi.fn() }))
 vi.mock('../data/stockRepo', () => stock)
+vi.mock('../data/freezerRepo', () => ({
+  cook: vi.fn(), undoCook: vi.fn(), useDose: vi.fn(), deleteBag: vi.fn(), restoreBag: vi.fn(), backToFreezer: vi.fn(), moveToFridge: vi.fn(), updateBag: vi.fn(),
+}))
 
 /** Opens Casa on a place tab (products default to Despensa). */
 const renderIt = (tab = 'Despensa') => {
@@ -349,4 +352,17 @@ test('at 0 with a pending quantity "+" stays, and Comprei moves to the row menu'
   expect(screen.queryByRole('button', { name: 'Comprei Kefir' })).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: 'Mais ações de Kefir' }))
   expect(screen.getByRole('button', { name: 'Comprei Kefir' })).toBeTruthy()
+})
+
+test('the Frigorífico tab shows "Para comer primeiro" only when there are fridge bags', () => {
+  data.bags = [bag({ name: 'Vaca', where: 'frigorifico', movedKey: '2026-10-28' }), bag({ name: 'Frango' })]
+  const { unmount } = renderIt('Frigorífico')
+  expect(screen.getByText('Para comer primeiro')).toBeTruthy()
+  expect(screen.getByText(/a descongelar desde ontem/)).toBeTruthy()
+  fireEvent.click(screen.getByRole('tab', { name: 'Despensa' }))
+  expect(screen.queryByText('Para comer primeiro')).toBeNull()
+  unmount()
+  data.bags = [bag({ name: 'Frango' })]
+  renderIt('Frigorífico')
+  expect(screen.queryByText('Para comer primeiro')).toBeNull()
 })

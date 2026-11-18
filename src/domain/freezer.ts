@@ -134,3 +134,7 @@ export function freezeDefaults(p: Product): { amount: string; unit: FreezerUnit 
 export function amountWas(amount?: number, unit?: FreezerUnit): { amount?: number; unit?: FreezerUnit } {
   return amount ? { amount, ...(unit ? { unit } : {}) } : {}
 }
+
+/** The fixed note on comida feita: «Vaca 1 kg», written when it is cooked and never updated. */
+export const madeFromOf = (b: { name: string; amount: number; unit: FreezerUnit }): string =>
+  `${b.name} ${formatAmount(b.amount)} ${unitLabel(b.unit)}`
