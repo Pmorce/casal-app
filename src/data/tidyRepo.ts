@@ -1,4 +1,4 @@
-import { deleteDoc, doc, updateDoc } from 'firebase/firestore'
+import { deleteDoc, deleteField, doc, updateDoc } from 'firebase/firestore'
 import type { TidyPlan } from '../domain/tidy'
 import { db } from './firebase'
 import { fire } from './write'
@@ -9,7 +9,10 @@ import { fire } from './write'
  */
 export function applyTidy(plan: TidyPlan): void {
   const q = { quiet: true }
-  for (const p of plan.products) fire(updateDoc(doc(db, 'products', p.id), p.data), q)
+  for (const p of plan.products) {
+    const { uncounted, ...rest } = p.data
+    fire(updateDoc(doc(db, 'products', p.id), uncounted === null ? { ...rest, uncounted: deleteField() } : p.data), q)
+  }
   for (const i of plan.items) fire(updateDoc(doc(db, 'shopping', i.id), i.data), q)
   for (const b of plan.bags) fire(updateDoc(doc(db, 'freezerBags', b.id), b.data), q)
   for (const id of plan.deleteItems) fire(deleteDoc(doc(db, 'shopping', id)), q)

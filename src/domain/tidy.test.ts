@@ -169,6 +169,28 @@ describe('tidyPlan', () => {
     expect(tidyPlan(after.products, after.items, after.bags).isEmpty).toBe(true)
   })
 
+  it('merged counts add up, a negative count becomes 0, and it converges', () => {
+    const products = [
+      prod({ id: 'a', name: 'Iogurte', count: 2, lastQty: 4, uncounted: true }),
+      prod({ id: 'b', name: 'iogurte', count: 3, qtyPending: true }),
+      prod({ id: 'c', name: 'Sal', count: -1 }),
+      prod({ id: 'd', name: 'Arroz', uncounted: true }),
+      prod({ id: 'e', name: 'arroz', uncounted: true, lastQty: 2 }),
+    ]
+    const plan = tidyPlan(products, [], [])
+    const after = apply(plan, products, [], [])
+    const iog = after.products.find(x => x.id === 'a')
+    expect(iog?.count).toBe(5)
+    expect(iog?.lastQty).toBe(4)
+    expect(iog?.qtyPending).toBe(true)
+    expect(plan.products.find(x => x.id === 'a')?.data.uncounted).toBeNull()
+    expect(after.products.find(x => x.id === 'c')?.count).toBe(0)
+    const arroz = after.products.find(x => x.id === 'd')
+    expect(arroz?.uncounted).toBe(true)
+    expect(arroz?.lastQty).toBe(2)
+    expect(tidyPlan(after.products, [], []).isEmpty).toBe(true)
+  })
+
   it('applying the plan and planning again gives an empty plan', () => {
     const f = mergeFixture()
     const items = [...f.items, item({ id: 'i2', text: 'Leite', productId: 'b' })]

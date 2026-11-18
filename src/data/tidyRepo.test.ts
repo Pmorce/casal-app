@@ -12,6 +12,7 @@ vi.mock('firebase/firestore', () => ({
   doc: vi.fn((...args: unknown[]) => ({ path: args.slice(1).join('/') })),
   updateDoc: fs.updateDoc,
   deleteDoc: fs.deleteDoc,
+  deleteField: () => 'DEL',
 }))
 
 beforeEach(() => { vi.clearAllMocks(); fs.log.length = 0 })
@@ -37,4 +38,9 @@ test('every write is quiet', () => {
   const calls = vi.mocked(fire).mock.calls
   expect(calls).toHaveLength(5)
   calls.forEach(c => expect(c[1]).toEqual({ quiet: true }))
+})
+
+test('uncounted: null becomes deleteField, never undefined', () => {
+  applyTidy({ products: [{ id: 'a', data: { count: 5, uncounted: null } }], items: [], bags: [], deleteItems: [], deleteProducts: [], isEmpty: false } as never)
+  expect(fs.updateDoc).toHaveBeenCalledWith({ path: 'products/a' }, { count: 5, uncounted: 'DEL' })
 })

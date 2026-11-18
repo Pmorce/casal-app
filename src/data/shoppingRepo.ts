@@ -7,7 +7,11 @@ import type { FinishPlan } from '../domain/finish'
 import { itemsOfProduct } from '../domain/pantry'
 import { recordPurchase, snoozeUntil } from '../domain/rhythm'
 import type { DateKey } from '../domain/dates'
+import { COUNTED_ZONES } from '../domain/stock'
 import type { FreezerBag, Part, Product, ShoppingItem, Trip, Zone } from '../domain/types'
+
+/** A product of a counted zone is born counted (0 until it is bought); freezer and one-off products are not. */
+const newCount = (zone: Zone): { count?: 0 } => (COUNTED_ZONES.includes(zone) ? { count: 0 } : {})
 
 /**
  * A known product name goes straight on the list. A new name returns 'needsZone' without writing:
@@ -32,7 +36,7 @@ export function addItem(
   } else if (zone) {
     const batch = writeBatch(db)
     const product = doc(collection(db, 'products'))
-    batch.set(product, { name: clean, location: zone })
+    batch.set(product, { name: clean, location: zone, ...newCount(zone) })
     batch.set(doc(collection(db, 'shopping')), { ...base, productId: product.id })
     fire(batch.commit())
   } else {
@@ -48,7 +52,7 @@ export function classifyItem(item: ShoppingItem, zone: Zone | 'oneOff', products
   if (zone === 'oneOff') return fire(updateDoc(doc(db, 'shopping', item.id), { oneOff: true }))
   const batch = writeBatch(db)
   const product = doc(collection(db, 'products'))
-  batch.set(product, { name: item.text, location: zone })
+  batch.set(product, { name: item.text, location: zone, ...newCount(zone) })
   batch.update(doc(db, 'shopping', item.id), { productId: product.id })
   fire(batch.commit())
 }
@@ -211,11 +215,11 @@ export function undoBought(s: BoughtSnapshot): void {
   for (const { id, ...data } of s.items) fire(setDoc(doc(db, 'shopping', id), data))
 }
 
-export function addProduct(name: string, location: Zone, products: Product[]): 'added' | 'duplicate' | 'empty' {
+export function addProduct(name: string, location: Zone, products: Product[], count?: number): 'added' | 'duplicate' | 'empty' {
   const clean = cleanText(name)
   if (!clean) return 'empty'
   if (products.some(p => normalize(p.name) === normalize(clean))) return 'duplicate'
-  fire(addDoc(collection(db, 'products'), { name: clean, location }))
+  fire(addDoc(collection(db, 'products'), { name: clean, location, ...(count !== undefined ? { count } : {}) }))
   return 'added'
 }
 

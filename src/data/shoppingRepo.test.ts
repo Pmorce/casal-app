@@ -1,5 +1,5 @@
 import {
-  addItem, addPart, boughtOutside, clearParts, ensureMeatProduct, finish, markMissing, removePart, renameProduct, setFreezerCategory, toggleCart, undoBought, undoFinish,
+  addItem, addPart, addProduct, classifyItem, boughtOutside, clearParts, ensureMeatProduct, finish, markMissing, removePart, renameProduct, setFreezerCategory, toggleCart, undoBought, undoFinish,
 } from './shoppingRepo'
 import { bag, item, part, prod } from '../domain/testFactories'
 import { fire } from './write'
@@ -64,6 +64,26 @@ test('choosing a zone creates the Casa product and the linked item together', ()
   expect(fs.set).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ name: 'Tremoços', location: 'despensa' }))
   expect(fs.set).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ text: 'Tremoços', status: 'porComprar', productId: expect.any(String) }))
   expect(fs.commit).toHaveBeenCalledTimes(1)
+})
+
+test('a new fridge product from the list is born counted (0); freezer is not', () => {
+  addItem('Kefir', 'Ana', [], [], 'frigorifico')
+  expect(fs.set).toHaveBeenCalledWith(expect.anything(), { name: 'Kefir', location: 'frigorifico', count: 0 })
+  fs.set.mockClear()
+  addItem('Pescada', 'Rui', [], [], 'congelador')
+  expect(fs.set).toHaveBeenCalledWith(expect.anything(), { name: 'Pescada', location: 'congelador' })
+})
+
+test('classifying a "sem zona" item into a counted zone creates the product with count 0', () => {
+  classifyItem(item({ id: 'i9', text: 'Detergente' }), 'limpeza', [])
+  expect(fs.set).toHaveBeenCalledWith(expect.anything(), { name: 'Detergente', location: 'limpeza', count: 0 })
+})
+
+test('+ Produto writes count only when given', () => {
+  addProduct('Sal', 'despensa', [], 3)
+  expect(fs.addDoc).toHaveBeenLastCalledWith('shoppingRef', { name: 'Sal', location: 'despensa', count: 3 })
+  addProduct('Pimenta', 'despensa', [])
+  expect(fs.addDoc).toHaveBeenLastCalledWith('shoppingRef', { name: 'Pimenta', location: 'despensa' })
 })
 
 test('"só desta vez" adds an item with no product', () => {

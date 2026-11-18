@@ -4,7 +4,8 @@ import type { FreezerBag, Product, ShoppingItem } from './types'
 
 export interface TidyPlan {
   /** product field changes (merge result on the kept product) */
-  products: { id: string; data: Partial<Pick<Product, 'boughtKeys' | 'freezerLast' | 'freezerCategory' | 'generic'>> }[]
+  /** `uncounted: null` = remove the field (applyTidy turns it into deleteField) */
+  products: { id: string; data: Partial<Pick<Product, 'boughtKeys' | 'freezerLast' | 'freezerCategory' | 'generic' | 'count' | 'lastQty' | 'qtyPending'>> & { uncounted?: true | null } }[]
   deleteProducts: string[]
   /** relink, stale name, and on a kept duplicate the parts of the dropped copies (then it is in the cart) */
   items: { id: string; data: Partial<Pick<ShoppingItem, 'productId' | 'text' | 'parts' | 'status'>> }[]
@@ -40,11 +41,19 @@ export function tidyPlan(products: Product[], items: ShoppingItem[], bags: Freez
     let last = keep.freezerLast
     let cat = keep.freezerCategory
     let generic = keep.generic
+    let count = keep.count
+    let lastQty = keep.lastQty
+    let qtyPending = keep.qtyPending
+    let uncounted = keep.uncounted
     for (const o of others) {
       keys = mergePurchases(keys, o.boughtKeys)
       last ??= o.freezerLast
       cat ??= o.freezerCategory
       generic ??= o.generic
+      count = count !== undefined && o.count !== undefined ? count + o.count : count ?? o.count
+      lastQty ??= o.lastQty
+      qtyPending ??= o.qtyPending
+      uncounted = uncounted && o.uncounted ? true : undefined
       remap.set(o.id, keep.id)
       deleteProducts.push(o.id)
     }
@@ -53,6 +62,11 @@ export function tidyPlan(products: Product[], items: ShoppingItem[], bags: Freez
     if (last !== keep.freezerLast) data.freezerLast = last
     if (cat !== keep.freezerCategory) data.freezerCategory = cat
     if (generic !== keep.generic) data.generic = generic
+    if (count !== undefined && count < 0) count = 0
+    if (count !== keep.count) data.count = count
+    if (lastQty !== keep.lastQty) data.lastQty = lastQty
+    if (qtyPending !== keep.qtyPending) data.qtyPending = qtyPending
+    if (!!uncounted !== !!keep.uncounted) data.uncounted = uncounted ?? null
     if (Object.keys(data).length) productChanges.push({ id: keep.id, data })
   }
 
