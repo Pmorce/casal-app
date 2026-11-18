@@ -4,9 +4,10 @@ import type { FreezerBag, Product, ShoppingItem } from './types'
 
 export interface TidyPlan {
   /** product field changes (merge result on the kept product) */
-  products: { id: string; data: Partial<Pick<Product, 'boughtKeys' | 'freezerLast' | 'freezerCategory'>> }[]
+  products: { id: string; data: Partial<Pick<Product, 'boughtKeys' | 'freezerLast' | 'freezerCategory' | 'generic'>> }[]
   deleteProducts: string[]
-  items: { id: string; data: Partial<Pick<ShoppingItem, 'productId' | 'text'>> }[]
+  /** relink, stale name, and on a kept duplicate the parts of the dropped copies (then it is in the cart) */
+  items: { id: string; data: Partial<Pick<ShoppingItem, 'productId' | 'text' | 'parts' | 'status'>> }[]
   deleteItems: string[]
   bags: { id: string; data: Partial<Pick<FreezerBag, 'productId' | 'name'>> }[]
   isEmpty: boolean
@@ -38,10 +39,12 @@ export function tidyPlan(products: Product[], items: ShoppingItem[], bags: Freez
     let keys = keep.boughtKeys
     let last = keep.freezerLast
     let cat = keep.freezerCategory
+    let generic = keep.generic
     for (const o of others) {
       keys = mergePurchases(keys, o.boughtKeys)
       last ??= o.freezerLast
       cat ??= o.freezerCategory
+      generic ??= o.generic
       remap.set(o.id, keep.id)
       deleteProducts.push(o.id)
     }
@@ -49,6 +52,7 @@ export function tidyPlan(products: Product[], items: ShoppingItem[], bags: Freez
     if (JSON.stringify(keys ?? []) !== JSON.stringify(keep.boughtKeys ?? [])) data.boughtKeys = keys
     if (last !== keep.freezerLast) data.freezerLast = last
     if (cat !== keep.freezerCategory) data.freezerCategory = cat
+    if (generic !== keep.generic) data.generic = generic
     if (Object.keys(data).length) productChanges.push({ id: keep.id, data })
   }
 
@@ -63,20 +67,28 @@ export function tidyPlan(products: Product[], items: ShoppingItem[], bags: Freez
   const byKey = new Map<string, ShoppingItem[]>()
   for (const i of items) byKey.set(keyOf(i), [...(byKey.get(keyOf(i)) ?? []), i])
   const dropped = new Set<string>()
+  // what the dropped copies held in the cart moves to the kept one, so no part is lost
+  const merged = new Map<string, TidyPlan['items'][number]['data']>()
   for (const list of byKey.values()) {
     if (list.length < 2) continue
-    const survivor = [...list].sort((a, b) => Number(b.status === 'carrinho') - Number(a.status === 'carrinho') || byId(a, b))[0]
-    for (const i of list) if (i !== survivor) dropped.add(i.id)
+    const [survivor, ...others] = [...list].sort((a, b) => Number(b.status === 'carrinho') - Number(a.status === 'carrinho') || byId(a, b))
+    const parts = [...(survivor.parts ?? [])]
+    for (const o of others.sort(byId)) {
+      dropped.add(o.id)
+      for (const part of o.parts ?? []) if (!parts.some(x => x.id === part.id)) parts.push(part)
+    }
+    if (parts.length === (survivor.parts?.length ?? 0)) continue
+    merged.set(survivor.id, { parts, ...(survivor.status !== 'carrinho' ? { status: 'carrinho' as const } : {}) })
   }
 
   // 1 (relink) + 2 (stale names): one entry per doc
   const itemChanges: TidyPlan['items'] = []
   for (const i of items) {
+    if (dropped.has(i.id)) continue
     const p = productOf(i.productId)
-    if (!p || dropped.has(i.id)) continue
-    const data: TidyPlan['items'][number]['data'] = {}
-    if (i.productId !== p.id) data.productId = p.id
-    if (i.text !== p.name) data.text = p.name
+    const data: TidyPlan['items'][number]['data'] = { ...merged.get(i.id) }
+    if (p && i.productId !== p.id) data.productId = p.id
+    if (p && i.text !== p.name) data.text = p.name
     if (Object.keys(data).length) itemChanges.push({ id: i.id, data })
   }
   const bagChanges: TidyPlan['bags'] = []

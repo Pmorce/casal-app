@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bag, item, prod } from './testFactories'
+import { bag, item, part, prod } from './testFactories'
 import { tidyPlan, type TidyPlan } from './tidy'
 import type { FreezerBag, Product, ShoppingItem } from './types'
 
@@ -106,6 +106,67 @@ describe('tidyPlan', () => {
     const plan = tidyPlan([], [item({ id: 'i2', text: 'Pilhas' }), item({ id: 'i1', text: ' pilhas ' })], [])
     expect(plan.deleteItems).toEqual(['i2'])
     expect(plan.items).toEqual([])
+  })
+
+  it('generic comes from the other product when the kept one is not marked', () => {
+    const a = prod({ id: 'a', name: 'Carne', boughtKeys: ['2026-10-01', '2026-10-02'] })
+    const b = prod({ id: 'b', name: 'carne', generic: true })
+    const plan = tidyPlan([a, b], [], [])
+    expect(plan.deleteProducts).toEqual(['b'])
+    expect(plan.products).toEqual([{ id: 'a', data: { generic: true } }])
+  })
+
+  it('the parts of a dropped copy move to the kept one, which goes to the cart', () => {
+    const p = prod({ id: 'c', name: 'Carne', generic: true })
+    const i1 = item({ id: 'i1', text: 'Carne', productId: 'c' })
+    const i2 = item({ id: 'i2', text: 'Carne', productId: 'c', parts: [part({ id: 'pa', name: 'Bifes' })] })
+    const plan = tidyPlan([p], [i1, i2], [])
+    // neither is in the cart, so the smallest id is kept and takes the parts
+    expect(plan.deleteItems).toEqual(['i2'])
+    expect(plan.items).toEqual([{ id: 'i1', data: { parts: [part({ id: 'pa', name: 'Bifes' })], status: 'carrinho' } }])
+  })
+
+  it('parts are concatenated without repeating an id', () => {
+    const p = prod({ id: 'c', name: 'Carne', generic: true })
+    const pa = part({ id: 'pa', name: 'Bifes' })
+    const pb = part({ id: 'pb', name: 'Costeletas' })
+    const pc = part({ id: 'pc', name: 'Entrecosto' })
+    const i1 = item({ id: 'i1', text: 'Carne', productId: 'c', status: 'carrinho', parts: [pa] })
+    const i2 = item({ id: 'i2', text: 'Carne', productId: 'c', status: 'carrinho', parts: [pa, pc] })
+    const i3 = item({ id: 'i3', text: 'Carne', productId: 'c', parts: [pb] })
+    const plan = tidyPlan([p], [i3, i2, i1], [])
+    expect([...plan.deleteItems].sort()).toEqual(['i2', 'i3'])
+    expect(plan.items).toEqual([{ id: 'i1', data: { parts: [pa, pc, pb] } }])
+  })
+
+  it('a loose kept item also gets the parts of its dropped copy', () => {
+    const pa = part({ id: 'pa' })
+    const plan = tidyPlan([], [item({ id: 'i1', text: 'Peixe' }), item({ id: 'i2', text: 'peixe', parts: [pa] })], [])
+    expect(plan.deleteItems).toEqual(['i2'])
+    expect(plan.items).toEqual([{ id: 'i1', data: { parts: [pa], status: 'carrinho' } }])
+  })
+
+  it('dropped copies without parts change nothing on the kept one', () => {
+    const p = prod({ id: 'c', name: 'Carne' })
+    const plan = tidyPlan([p], [item({ id: 'i1', text: 'Carne', productId: 'c' }), item({ id: 'i2', text: 'Carne', productId: 'c' })], [])
+    expect(plan.items).toEqual([])
+  })
+
+  it('merged parts and generic converge: planning again on the result is empty', () => {
+    const f = mergeFixture()
+    const products = [...f.products, prod({ id: 'm1', name: 'Carne', boughtKeys: ['2026-10-01'] }), prod({ id: 'm2', name: 'carne', generic: true })]
+    const items = [
+      ...f.items,
+      item({ id: 'i2', text: 'Leite', productId: 'b' }),
+      item({ id: 'k1', text: 'carne', productId: 'm2', parts: [part({ id: 'pa' })] }),
+      item({ id: 'k2', text: 'Carne', productId: 'm1', status: 'carrinho', parts: [part({ id: 'pb' })] }),
+      item({ id: 'k3', text: 'Carne', productId: 'm1', parts: [part({ id: 'pb' }), part({ id: 'pc' })] }),
+    ]
+    const plan = tidyPlan(products, items, f.bags)
+    const after = apply(plan, products, items, f.bags)
+    expect(after.items.find(i => i.id === 'k2')?.parts?.map(x => x.id)).toEqual(['pb', 'pa', 'pc'])
+    expect(after.products.find(x => x.id === 'm1')?.generic).toBe(true)
+    expect(tidyPlan(after.products, after.items, after.bags).isEmpty).toBe(true)
   })
 
   it('applying the plan and planning again gives an empty plan', () => {
