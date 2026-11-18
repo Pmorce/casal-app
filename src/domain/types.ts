@@ -41,9 +41,9 @@ export interface Product {
   /** "Ainda há" taps since the last purchase */
   snoozeCount?: number
   /** zone congelador only: which freezer tab its bags go to (else guessed from the name) */
+  freezerCategory?: 'carne' | 'outros'
   /** a generic product (e.g. meat): buying it asks "o que levas?" */
   generic?: true
-  freezerCategory?: 'carne' | 'outros'
   /** zone congelador only: amount of the last entry, to pre-fill the next one */
   freezerLast?: { amount: number; unit: FreezerUnit; key?: DateKey }
 }
