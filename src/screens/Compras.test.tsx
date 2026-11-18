@@ -81,7 +81,7 @@ test('the card titles are level-2 headings and the zone titles stay level 3', ()
   data.shopping = [item({ text: 'Leite', productId: 'l' }), item({ text: 'Pão', status: 'carrinho' })]
   renderIt()
   const h2 = screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent)
-  expect(h2).toEqual(['Por comprar 1', 'Talvez falte 1', 'No carrinho'])
+  expect(h2).toEqual(['Por comprar 1', 'Talvez falte 1'])
   expect(screen.getByRole('heading', { level: 3, name: 'Frigorífico' })).toBeTruthy()
 })
 
@@ -267,4 +267,18 @@ test('"Cancelar" closes the store picker without writing', () => {
   fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
   expect(screen.queryByText('Onde foi?')).toBeNull()
   expect(trips.startTrip).not.toHaveBeenCalled()
+})
+
+test('a ticked item keeps its place in the zone and there is no "No carrinho" card', () => {
+  data.products = ['a', 'c', 'l'].map(id => prod({ id, location: 'despensa' }))
+  data.shopping = [
+    item({ text: 'Leite', productId: 'l' }), item({ text: 'Arroz', status: 'carrinho', productId: 'a' }), item({ text: 'Café', productId: 'c' }),
+  ]
+  renderIt()
+  const names = ['Arroz', 'Café', 'Leite']
+  const order = screen.getAllByRole('button').map(b => b.getAttribute('aria-label')).filter(n => names.includes(n ?? ''))
+  expect(order).toEqual(names)
+  expect(screen.queryByRole('heading', { name: 'No carrinho' })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Arroz' }))
+  expect(repo.toggleCart).toHaveBeenCalledWith(expect.objectContaining({ text: 'Arroz' }), undefined)
 })

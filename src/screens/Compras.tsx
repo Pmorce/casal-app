@@ -62,9 +62,10 @@ export default function Compras() {
   // a trip left from an earlier day is cleared quietly; braces matter (see SpentForm)
   useEffect(() => { if (stale) leaveTrip() }, [stale])
 
-  const groups = groupByZone(items.filter(i => i.status === 'porComprar'), products)
-  const todoCount = groups.reduce((n, g) => n + g.items.length, 0)
-  const cart = items.filter(i => i.status === 'carrinho').sort((a, b) => a.text.localeCompare(b.text, 'pt-PT'))
+  // ticked items stay where they are (same alphabetical order) until "Terminar compras"
+  const groups = groupByZone(items, products)
+  const todoCount = items.filter(i => i.status === 'porComprar').length
+  const cart = items.filter(i => i.status === 'carrinho')
   const missing = maybeMissing(products, items, today, unlinkOrphans(bags, products))
   const toCasa = backToCasa(items, products)
 
@@ -115,7 +116,7 @@ export default function Compras() {
         <button className={i.status === 'carrinho' ? 'check on' : 'check'} aria-label={i.text} onClick={() => toggleCart(i, trip?.store)}>
           {i.status === 'carrinho' && <Icon name="check" />}
         </button>
-        <div className={i.status === 'carrinho' ? 'grow done-text' : 'grow'}>{i.text}</div>
+        <div className={i.status === 'carrinho' ? 'grow done-text soft' : 'grow'}>{i.text}</div>
         {i.status === 'porComprar' && <Avatar uid={i.addedBy} size="sm" />}
         {i.status === 'porComprar' && <button className="x-btn" aria-label={`Apagar ${i.text}`} onClick={() => remove(i)}><Icon name="x" /></button>}
       </div>
@@ -159,9 +160,9 @@ export default function Compras() {
           {groups.map(g => (
             <div key={g.group}>
               <div className="zone-title">
-                <Icon name={GROUP_ICON[g.group]} /><h3>{GROUP_LABEL[g.group]}</h3><span className="zone-count">{g.items.length}</span>
+                <Icon name={GROUP_ICON[g.group]} /><h3>{GROUP_LABEL[g.group]}</h3><span className="zone-count">{g.items.filter(i => i.status === 'porComprar').length}</span>
               </div>
-              {g.items.map(i => row(i, g.group === 'semZona'))}
+              {g.items.map(i => row(i, g.group === 'semZona' && i.status === 'porComprar'))}
             </div>
           ))}
         </div>
@@ -193,11 +194,6 @@ export default function Compras() {
 
         {cart.length > 0 && (
           <>
-            <div className="card">
-              <h2 className="card-title">No carrinho</h2>
-              {cart.map(i => row(i))}
-              <p className="small muted">Para tirar do carrinho, toca outra vez no ✓.</p>
-            </div>
             <button className="btn primary block" onClick={terminate}><Icon name="check" />Terminar compras ({cart.length})</button>
             <p className="small muted" style={{ textAlign: 'center' }}>
               {toCasa.length
