@@ -1,21 +1,25 @@
-import { useCallback, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { useCollection } from '../data/useCollection'
 import { useSession } from '../data/session'
 import { useToday } from '../hooks/useToday'
 import { addItem, classifyItem, deleteItem, finish, markMissing, snooze, toggleCart, undoFinish } from '../data/shoppingRepo'
 import { restore } from '../data/restore'
 import { undoFreeze, type FrozenBatch } from '../data/freezerRepo'
+import { addCustomStore, changeStore, leaveTrip, restoreTrip, startTrip } from '../data/tripRepo'
 import { backToCasa, maybeMissing } from '../domain/shopping'
 import { shownGap } from '../domain/rhythm'
 import { freezerInCart, unlinkOrphans } from '../domain/freezer'
+import { activeTrip, customStores, staleTrip, storeOptions } from '../domain/stores'
 import { GROUP_LABEL, groupByZone, guessZone, ZONES } from '../domain/zones'
-import type { FreezerBag, Product, ShoppingItem, Zone } from '../domain/types'
+import type { FreezerBag, Product, Purchase, ShoppingItem, Zone } from '../domain/types'
 import UndoToast from '../components/UndoToast'
 import SpentForm from '../components/SpentForm'
 import FreezeForm from '../components/FreezeForm'
 import PageHeader from '../components/PageHeader'
 import Avatar from '../components/Avatar'
 import Icon, { GROUP_ICON } from '../components/Icon'
+import StorePicker from '../components/StorePicker'
+import TripBar from '../components/TripBar'
 
 type ZonePick = Zone | 'oneOff'
 const PICKS: { value: ZonePick; short: string }[] = [...ZONES, { value: 'oneOff', short: 'Só desta vez' }]
@@ -38,6 +42,8 @@ export default function Compras() {
   const items = useCollection<ShoppingItem>('shopping')
   const products = useCollection<Product>('products')
   const bags = useCollection<FreezerBag>('freezerBags')
+  const meta = useCollection<{ id: string }>('meta')
+  const purchases = useCollection<Purchase>('purchases')
   const [text, setText] = useState('')
   const [msg, setMsg] = useState('')
   // a new name waits here for its zone (pre-selected guess) before anything is written
@@ -49,6 +55,12 @@ export default function Compras() {
   const [askSpent, setAskSpent] = useState(false)
   // bags saved from the freezer card; a ref so the undo created before them still sees them
   const savedBags = useRef<FrozenBatch[]>([])
+  // the shared trip: a store picker is open to start it or to change store
+  const trip = activeTrip(meta, today)
+  const [picking, setPicking] = useState<'start' | 'change' | null>(null)
+  const stale = staleTrip(meta, today) !== null
+  // a trip left from an earlier day is cleared quietly; braces matter (see SpentForm)
+  useEffect(() => { if (stale) leaveTrip() }, [stale])
 
   const groups = groupByZone(items.filter(i => i.status === 'porComprar'), products)
   const todoCount = groups.reduce((n, g) => n + g.items.length, 0)
@@ -75,6 +87,12 @@ export default function Compras() {
     setUndo({ message: `«${i.text}» apagado`, run: () => restore('shopping', [i]) })
   }
 
+  function leave() {
+    if (!trip) return
+    leaveTrip()
+    setUndo({ message: 'Saíste das compras', run: () => restoreTrip(trip) })
+  }
+
   function terminate() {
     const toFreeze = freezerInCart(items, products)
     const done = finish(items, products, today)
@@ -94,7 +112,7 @@ export default function Compras() {
   const row = (i: ShoppingItem, picker = false) => (
     <div key={i.id}>
       <div className={i.status === 'carrinho' ? 'row done' : 'row'}>
-        <button className={i.status === 'carrinho' ? 'check on' : 'check'} aria-label={i.text} onClick={() => toggleCart(i)}>
+        <button className={i.status === 'carrinho' ? 'check on' : 'check'} aria-label={i.text} onClick={() => toggleCart(i, trip?.store)}>
           {i.status === 'carrinho' && <Icon name="check" />}
         </button>
         <div className={i.status === 'carrinho' ? 'grow done-text' : 'grow'}>{i.text}</div>
@@ -109,6 +127,15 @@ export default function Compras() {
     <>
       <PageHeader title="Compras" sub={`${todoCount} por comprar · ${cart.length} no carrinho`} />
       <div className="lift">
+        <TripBar trip={trip} cartCount={cart.length} onStart={() => setPicking('start')} onChange={() => setPicking('change')} onLeave={leave} />
+        {picking && (
+          <StorePicker title="Onde foi?" options={storeOptions(customStores(meta), purchases)}
+            onAddCustom={name => addCustomStore(name, customStores(meta))}
+            onPick={store => {
+              if (store) { if (picking === 'start') startTrip(store, uid, today); else if (trip) changeStore(trip, store) }
+              setPicking(null)
+            }} />
+        )}
         <form className="add-bar" onSubmit={submit}>
           <input className="input" list="sugestoes" placeholder="+ Adicionar (ex.: Leite)" value={text}
             onChange={e => { setText(e.target.value); setMsg(''); setGuess(null) }} />

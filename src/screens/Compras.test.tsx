@@ -2,12 +2,12 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import Compras from './Compras'
 import { item, prod } from '../domain/testFactories'
-import type { FreezerBag, Product, ShoppingItem } from '../domain/types'
+import type { FreezerBag, Product, ShoppingItem, Trip } from '../domain/types'
 
-const data = vi.hoisted(() => ({ shopping: [] as ShoppingItem[], products: [] as Product[], bags: [] as FreezerBag[] }))
+const data = vi.hoisted(() => ({ shopping: [] as ShoppingItem[], products: [] as Product[], bags: [] as FreezerBag[], meta: [] as { id: string }[] }))
 vi.mock('../data/useCollection', () => ({
   useCollection: (path: string) =>
-    (path === 'shopping' ? data.shopping : path === 'products' ? data.products : path === 'freezerBags' ? data.bags : []),
+    (path === 'shopping' ? data.shopping : path === 'products' ? data.products : path === 'freezerBags' ? data.bags : path === 'meta' ? data.meta : []),
 }))
 vi.mock('../data/session', () => ({ useSession: () => ({ uid: 'P', name: 'Ana', members: { P: 'Ana', B: 'Rui' } }) }))
 vi.mock('../hooks/useToday', () => ({ useToday: () => '2026-10-29' }))
@@ -18,6 +18,8 @@ const repo = vi.hoisted(() => ({
 }))
 vi.mock('../data/shoppingRepo', () => repo)
 vi.mock('../data/restore', () => ({ restore: vi.fn() }))
+const trips = vi.hoisted(() => ({ startTrip: vi.fn(), changeStore: vi.fn(), leaveTrip: vi.fn(), restoreTrip: vi.fn(), addCustomStore: vi.fn() }))
+vi.mock('../data/tripRepo', () => trips)
 const exp = vi.hoisted(() => ({ addExpense: vi.fn() }))
 vi.mock('../data/expensesRepo', () => exp)
 const frozen = { bagIds: ['b1', 'b2'], previous: [] }
@@ -25,7 +27,7 @@ const freezer = vi.hoisted(() => ({ freezeBought: vi.fn((): unknown => null), un
 vi.mock('../data/freezerRepo', () => freezer)
 
 const renderIt = () => render(<MemoryRouter><Compras /></MemoryRouter>)
-beforeEach(() => { vi.clearAllMocks(); data.products = []; data.bags = []; freezer.freezeBought.mockReturnValue(frozen) })
+beforeEach(() => { vi.clearAllMocks(); data.products = []; data.bags = []; data.meta = []; freezer.freezeBought.mockReturnValue(frozen) })
 
 test('"Terminar compras" only appears with something in the cart', () => {
   data.shopping = [item({ text: 'Café', status: 'porComprar' })]
@@ -209,4 +211,52 @@ test('finishing again with the freezer card open adds the new products to it, ke
   fireEvent.click(screen.getByRole('button', { name: /Terminar compras/ }))
   expect((screen.getByLabelText('Quantidade de Carne de vaca') as HTMLInputElement).value).toBe('5')
   expect(screen.getByLabelText('Quantidade de Gelado')).toBeTruthy()
+})
+
+const lidl: Trip = { id: 'trip', store: 'Lidl', stores: ['Lidl'], startedBy: 'P', dateKey: '2026-10-29' }
+
+test('"Iniciar compras" asks where and starts the trip', () => {
+  renderIt()
+  fireEvent.click(screen.getByRole('button', { name: 'Iniciar compras' }))
+  expect(screen.getByText('Onde foi?')).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'Não digo' })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Lidl' }))
+  expect(trips.startTrip).toHaveBeenCalledWith('Lidl', 'P', '2026-10-29')
+})
+
+test('with an active trip the tick takes the store', () => {
+  data.meta = [lidl]
+  data.shopping = [item({ text: 'Café' })]
+  renderIt()
+  expect(screen.getByText('No Lidl · 0 no carrinho')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Café' }))
+  expect(repo.toggleCart).toHaveBeenCalledWith(expect.objectContaining({ text: 'Café' }), 'Lidl')
+})
+
+test("yesterday's trip counts as no trip and is left once, quietly", () => {
+  data.meta = [{ ...lidl, dateKey: '2026-10-28' } as Trip]
+  data.shopping = [item({ text: 'Café' })]
+  const { rerender } = renderIt()
+  expect(screen.getByRole('button', { name: 'Iniciar compras' })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Café' }))
+  expect(repo.toggleCart).toHaveBeenCalledWith(expect.objectContaining({ text: 'Café' }), undefined)
+  rerender(<MemoryRouter><Compras /></MemoryRouter>)
+  expect(trips.leaveTrip).toHaveBeenCalledTimes(1)
+})
+
+test('"Mudar de loja" changes the store of the trip', () => {
+  data.meta = [lidl]
+  renderIt()
+  fireEvent.click(screen.getByRole('button', { name: 'Mudar de loja' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Continente' }))
+  expect(trips.changeStore).toHaveBeenCalledWith(expect.objectContaining({ store: 'Lidl' }), 'Continente')
+})
+
+test('"Sair" leaves the trip and offers undo', () => {
+  data.meta = [lidl]
+  renderIt()
+  fireEvent.click(screen.getByRole('button', { name: 'Sair' }))
+  expect(trips.leaveTrip).toHaveBeenCalledTimes(1)
+  fireEvent.click(screen.getByRole('button', { name: 'Desfazer' }))
+  expect(trips.restoreTrip).toHaveBeenCalledWith(expect.objectContaining({ store: 'Lidl' }))
 })

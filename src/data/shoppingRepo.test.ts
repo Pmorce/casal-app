@@ -1,4 +1,4 @@
-import { addItem, boughtOutside, finish, markMissing, renameProduct, setFreezerCategory, undoFinish } from './shoppingRepo'
+import { addItem, boughtOutside, finish, markMissing, renameProduct, setFreezerCategory, toggleCart, undoFinish } from './shoppingRepo'
 import { bag, item, prod } from '../domain/testFactories'
 import { fire } from './write'
 
@@ -130,4 +130,16 @@ test('rename writes the product loudly and each linked item and bag on its own, 
   expect(fs.commit).not.toHaveBeenCalled()
   const opts = vi.mocked(fire).mock.calls.map(c => c[1])
   expect(opts).toEqual([undefined, { quiet: true }, { quiet: true }])
+})
+
+test('ticking with a store writes it on the item; without a store there is no field', () => {
+  toggleCart(item({ id: 'a', status: 'porComprar' }), 'Lidl')
+  expect(fs.updateDoc).toHaveBeenLastCalledWith(expect.anything(), { status: 'carrinho', store: 'Lidl' })
+  toggleCart(item({ id: 'a', status: 'porComprar' }))
+  expect(fs.updateDoc).toHaveBeenLastCalledWith(expect.anything(), { status: 'carrinho' })
+})
+
+test('unticking removes the store from the item', () => {
+  toggleCart(item({ id: 'a', status: 'carrinho', store: 'Lidl' }), 'Lidl')
+  expect(fs.updateDoc).toHaveBeenLastCalledWith(expect.anything(), { status: 'porComprar', store: 'DEL' })
 })

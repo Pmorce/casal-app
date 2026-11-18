@@ -67,8 +67,12 @@ export function snooze(p: Product, today: DateKey): void {
   fire(updateDoc(doc(db, 'products', p.id), { snoozedUntil: snoozeUntil(p, today), snoozeCount: (p.snoozeCount ?? 0) + 1 }))
 }
 
-export function toggleCart(item: ShoppingItem): void {
-  fire(updateDoc(doc(db, 'shopping', item.id), { status: item.status === 'carrinho' ? 'porComprar' : 'carrinho' }))
+/** Ticking takes the store of the trip (no field without one); unticking drops it again. */
+export function toggleCart(item: ShoppingItem, store?: string): void {
+  const data = item.status === 'carrinho'
+    ? { status: 'porComprar', store: deleteField() }
+    : { status: 'carrinho', ...(store ? { store } : {}) }
+  fire(updateDoc(doc(db, 'shopping', item.id), data))
 }
 
 /**
