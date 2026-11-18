@@ -31,9 +31,16 @@ test('unauthenticated cannot read', async () => {
   await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'shopping/a')))
 })
 
-test('signed-in non-member cannot read or write', async () => {
-  await assertFails(getDoc(doc(as('intruso'), 'shopping/a')))
-  await assertFails(setDoc(doc(as('intruso'), 'shopping/a'), { text: 'x' }))
+test('signed-in non-member cannot read or write any shared collection', async () => {
+  await env.withSecurityRulesDisabled(async ctx => {
+    for (const col of SHARED) await setDoc(doc(ctx.firestore(), `${col}/a`), { v: 1 })
+  })
+  for (const col of SHARED) {
+    await assertFails(getDoc(doc(as('intruso'), `${col}/a`)))
+    await assertFails(setDoc(doc(as('intruso'), `${col}/b`), { v: 1 }))
+    await assertFails(updateDoc(doc(as('intruso'), `${col}/a`), { v: 2 }))
+    await assertFails(deleteDoc(doc(as('intruso'), `${col}/a`)))
+  }
 })
 
 test('members read and write shared collections', async () => {
