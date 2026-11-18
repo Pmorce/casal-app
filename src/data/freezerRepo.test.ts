@@ -128,3 +128,21 @@ test('splitBag requires the bag to still exist (the other phone may have taken i
   expect(fs.update).toHaveBeenCalledWith(expect.objectContaining({ path: 'freezerBags/b1' }), expect.any(Object))
   expect(fs.update.mock.invocationCallOrder[0]).toBeLessThan(fs.delete.mock.invocationCallOrder[0])
 })
+
+test('freezeBought writes the amount into the purchase (quiet, on its own); undo puts the previous one back or removes it', () => {
+  const v = prod({ id: 'v', location: 'congelador' })
+  const done = freezeBought([
+    { product: v, amount: 3, unit: 'kg', purchaseId: 'pu1', was: { amount: 2, unit: 'kg' } },
+    { product: v, amount: 1, unit: 'kg', purchaseId: 'pu2' },
+    { product: v, amount: 1, unit: 'un' },
+  ], '2026-10-30')
+  expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'purchases/pu1' }), { amount: 3, unit: 'kg' })
+  expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'purchases/pu2' }), { amount: 1, unit: 'kg' })
+  expect(fs.updateDoc.mock.calls.filter(c => (c[0] as { path: string }).path.startsWith('purchases/'))).toHaveLength(2)
+  expect(done.previous.length).toBe(3)
+  expect(done.purchases).toEqual([{ id: 'pu1', amount: 2, unit: 'kg' }, { id: 'pu2' }])
+  vi.clearAllMocks()
+  undoFreeze(done)
+  expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'purchases/pu1' }), { amount: 2, unit: 'kg' })
+  expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'purchases/pu2' }), { amount: 'DEL', unit: 'DEL' })
+})

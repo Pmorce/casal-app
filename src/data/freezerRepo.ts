@@ -63,17 +63,33 @@ export interface FrozenBatch {
   bagIds: string[]
   /** each product's last amount before, so undo can put it back */
   previous: { id: string; freezerLast?: Product['freezerLast'] }[]
+  /** the purchases whose amount was filled in, with what they had before */
+  purchases: { id: string; amount?: number; unit?: FreezerUnit }[]
 }
 
 const setFreezerLast = (id: string, freezerLast: Product['freezerLast']) =>
   // quiet: if the product was deleted meanwhile the bags are still saved, which is what matters
   fire(updateDoc(doc(db, 'products', id), { freezerLast: freezerLast ?? deleteField() }), { quiet: true })
 
+const setPurchaseAmount = (id: string, was: { amount?: number; unit?: FreezerUnit }) =>
+  // quiet, on its own: a purchase deleted meanwhile must not take the bags down
+  fire(updateDoc(doc(db, 'purchases', id), { amount: was.amount ?? deleteField(), unit: was.unit ?? deleteField() }), { quiet: true })
+
+export interface FreezeRow {
+  product: Product
+  amount: number
+  unit: FreezerUnit
+  /** the purchase this came from: it gets the amount too */
+  purchaseId?: string
+  /** what that purchase had before, for undo */
+  was?: { amount?: number; unit?: FreezerUnit }
+}
+
 /**
  * "Para o congelador": one bag per product, as it came from the shop, linked to it. The bags go in one batch;
  * each product's last amount is updated on its own, so a product deleted meanwhile does not take the bags down.
  */
-export function freezeBought(rows: { product: Product; amount: number; unit: FreezerUnit }[], today: DateKey): FrozenBatch {
+export function freezeBought(rows: FreezeRow[], today: DateKey): FrozenBatch {
   const batch = writeBatch(db)
   const ids = rows.map(({ product, amount, unit }) => {
     const ref = newBagRef()
@@ -84,12 +100,19 @@ export function freezeBought(rows: { product: Product; amount: number; unit: Fre
   })
   fire(batch.commit())
   rows.forEach(({ product, amount, unit }) => setFreezerLast(product.id, { amount, unit, key: today }))
-  return { bagIds: ids, previous: rows.map(({ product }) => ({ id: product.id, freezerLast: product.freezerLast })) }
+  const withPurchase = rows.filter((r): r is FreezeRow & { purchaseId: string } => !!r.purchaseId)
+  withPurchase.forEach(r => setPurchaseAmount(r.purchaseId, { amount: r.amount, unit: r.unit }))
+  return {
+    bagIds: ids,
+    previous: rows.map(({ product }) => ({ id: product.id, freezerLast: product.freezerLast })),
+    purchases: withPurchase.map(r => ({ id: r.purchaseId, ...(r.was?.amount ? { amount: r.was.amount } : {}), ...(r.was?.amount && r.was.unit ? { unit: r.was.unit } : {}) })),
+  }
 }
 
 export function undoFreeze(done: FrozenBatch): void {
   deleteBags(done.bagIds)
   done.previous.forEach(p => setFreezerLast(p.id, p.freezerLast))
+  done.purchases.forEach(p => setPurchaseAmount(p.id, p))
 }
 
 /** "Dividir": the bag becomes one bag per amount, same entry date, tab and link. Returns the new ids for undo. */

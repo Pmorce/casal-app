@@ -15,7 +15,7 @@ const repo = vi.hoisted(() => ({
   addItem: vi.fn(), toggleCart: vi.fn(), deleteItem: vi.fn(), undoFinish: vi.fn(),
   classifyItem: vi.fn(), markMissing: vi.fn(), snooze: vi.fn(),
   addPart: vi.fn(), removePart: vi.fn(), clearParts: vi.fn(), ensureMeatProduct: vi.fn(),
-  finish: vi.fn(() => ({ items: [], products: [] })),
+  finish: vi.fn(() => ({ items: [], products: [], purchaseIds: {} as Record<string, string> })),
 }))
 vi.mock('../data/shoppingRepo', () => repo)
 vi.mock('../data/restore', () => ({ restore: vi.fn() }))

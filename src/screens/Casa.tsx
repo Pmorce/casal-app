@@ -8,7 +8,7 @@ import { checkRename } from '../domain/pantry'
 import { MAX_SNOOZES, rhythmOf, shownGap, stockStatus, type StockStatus } from '../domain/rhythm'
 import { bagsOfProduct, bagsSummary, unlinkOrphans } from '../domain/freezer'
 import SpentForm from '../components/SpentForm'
-import FreezeForm from '../components/FreezeForm'
+import FreezeForm, { type FreezeInput } from '../components/FreezeForm'
 import { freezerCategoryOf, ZONES } from '../domain/zones'
 import type { DateKey } from '../domain/dates'
 import type { FreezerBag, Product, ShoppingItem, Zone } from '../domain/types'
@@ -61,7 +61,7 @@ export default function Casa() {
   const [spentFor, setSpentFor] = useState<string | null>(null)
   // "Comprei" on Congelador products also asks how much went in, one card for several in a row
   // (closing it does not undo the purchases)
-  const [freezing, setFreezing] = useState<Product[]>([])
+  const [freezing, setFreezing] = useState<FreezeInput[]>([])
 
   function submit(e: FormEvent) {
     e.preventDefault()
@@ -81,10 +81,10 @@ export default function Casa() {
   function bought(p: Product) {
     const done = boughtOutside(p, items, today)
     setSpentFor(null)
-    if (p.location === 'congelador') setFreezing(f => (f.some(x => x.id === p.id) ? f : [...f, p]))
+    if (p.location === 'congelador') setFreezing(f => (f.some(x => x.key === p.id) ? f : [...f, { key: p.id, product: p }]))
     setUndo({
       message: `«${p.name}» comprado`,
-      run: () => { undoBought(done); setFreezing(f => f.filter(x => x.id !== p.id)) },
+      run: () => { undoBought(done); setFreezing(f => f.filter(x => x.key !== p.id)) },
       // offered, not forced: several "Comprei" in a row are often one single purchase
       action: { label: 'Registar gasto', run: () => setSpentFor(p.name) },
     })
@@ -98,7 +98,7 @@ export default function Casa() {
         </p></>}
         right={<button className="btn small" onClick={() => setEditing(!editing)}>{editing ? 'Concluir' : 'Editar'}</button>} />
       <div className="lift">
-        {freezing.length > 0 && <FreezeForm products={freezing} today={today} onSaved={() => {}} onDone={() => setFreezing([])} />}
+        {freezing.length > 0 && <FreezeForm rows={freezing} today={today} onSaved={() => {}} onDone={() => setFreezing([])} />}
         {spentFor && <SpentForm title={`Quanto custou «${spentFor}»?`} today={today} onDone={() => setSpentFor(null)} />}
 
         {editing ? ZONES.map(zone => {

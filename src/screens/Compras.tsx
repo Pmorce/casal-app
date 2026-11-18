@@ -16,7 +16,7 @@ import { GROUP_LABEL, groupByZone, guessZone, ZONES } from '../domain/zones'
 import type { FreezerBag, Product, Purchase, ShoppingItem, Zone } from '../domain/types'
 import UndoToast from '../components/UndoToast'
 import SpentForm from '../components/SpentForm'
-import FreezeForm from '../components/FreezeForm'
+import FreezeForm, { type FreezeInput } from '../components/FreezeForm'
 import PageHeader from '../components/PageHeader'
 import Avatar from '../components/Avatar'
 import Icon, { GROUP_ICON } from '../components/Icon'
@@ -54,7 +54,7 @@ export default function Compras() {
   const [undo, setUndo] = useState<{ message: string; run: () => void } | null>(null)
   const closeUndo = useCallback(() => setUndo(null), [])
   // after "Terminar compras": first what went to the freezer, then how much it was, one card per store (null: no store)
-  const [freezing, setFreezing] = useState<Product[] | null>(null)
+  const [freezing, setFreezing] = useState<FreezeInput[] | null>(null)
   const [spentQueue, setSpentQueue] = useState<(string | null)[]>([])
   // "Terminar" without a trip and with ticks of no store asks "Onde foi?" first
   const [askingStore, setAskingStore] = useState(false)
@@ -118,14 +118,18 @@ export default function Compras() {
   function finishWith(asked: string | null) {
     setAskingStore(false)
     const plan = planFinish(items, products, { trip, asked, uid, today })
-    // until the freezer card takes the plan's rows (pre-filled parts), it gets their products, once each
-    const ids = new Set(plan.freezer.map(f => f.productId))
-    const toFreeze = products.filter(p => ids.has(p.id)).sort((a, b) => a.name.localeCompare(b.name, 'pt-PT'))
     const done = finish(items, products, plan, today, trip)
+    // one row per part (pre-filled) and per other Congelador product, tied to its purchase; a product that is gone is skipped
+    const toFreeze = plan.freezer.flatMap((f): FreezeInput[] => {
+      const product = products.find(p => p.id === f.productId)
+      if (!product) return []
+      const purchaseId = done.purchaseIds[f.key]
+      return [{ key: f.key, product, ...(f.amount ? { amount: f.amount } : {}), ...(f.unit ? { unit: f.unit } : {}), ...(purchaseId ? { purchaseId } : {}) }]
+    }).sort((a, b) => a.product.name.localeCompare(b.product.name, 'pt-PT'))
     savedBags.current = []
     // a second "Terminar" with the card still open adds to it (what was typed stays)
     setFreezing(open => {
-      const all = [...(open ?? []), ...toFreeze.filter(p => !open?.some(o => o.id === p.id))]
+      const all = [...(open ?? []), ...toFreeze.filter(r => !open?.some(o => o.key === r.key))]
       return all.length ? all : null
     })
     setSpentQueue(q => [...q, ...plan.stores.filter(s => !q.includes(s))])
@@ -223,7 +227,7 @@ export default function Compras() {
 
         {/* where the cart was, i.e. right under the finger that tapped "Terminar compras" */}
         {freezing && (
-          <FreezeForm products={freezing} today={today}
+          <FreezeForm rows={freezing} today={today}
             onSaved={batch => { savedBags.current = [...savedBags.current, batch] }} onDone={() => setFreezing(null)} />
         )}
         {spentQueue.length > 0 && !freezing && (

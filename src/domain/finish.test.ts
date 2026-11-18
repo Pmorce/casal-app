@@ -145,3 +145,14 @@ test('backToCasa does not name a product that is already generic', () => {
   const products = [meat({ id: 'carne', name: 'Carne', generic: true }), prod({ id: 'l', name: 'Leite' })]
   expect(backToCasa([item({ productId: 'carne', status: 'carrinho' }), item({ productId: 'l', status: 'carrinho' })], products)).toEqual(['Leite'])
 })
+
+test('a plain Congelador item whose product is also a part gets no second freezer row', () => {
+  const vaca = meat({ id: 'vaca', name: 'Vaca' })
+  const carne = meat({ id: 'carne', name: 'Carne' })
+  const items = [
+    item({ id: 'p', text: 'Vaca', productId: 'vaca', status: 'carrinho' }),
+    item({ id: 'i', productId: 'carne', status: 'carrinho', parts: [part({ id: 'a', productId: 'vaca', name: 'Vaca', amount: 3, unit: 'kg' })] }),
+  ]
+  const plan = planFinish(items, [vaca, carne], ctx())
+  expect(plan.freezer).toEqual([{ key: 'a', productId: 'vaca', amount: 3, unit: 'kg' }])
+})

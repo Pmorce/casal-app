@@ -92,7 +92,8 @@ export function planFinish(
     makeGeneric,
     purchases,
     stores,
-    freezer: [...freezer, ...plainFreezer],
+    // plain rows are for the OTHER congelador products: one that is also a part already has its part rows
+    freezer: [...freezer, ...plainFreezer.filter(f => !freezer.some(x => x.productId === f.productId))],
   }
 }
 
