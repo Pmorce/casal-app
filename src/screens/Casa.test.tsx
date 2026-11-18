@@ -366,3 +366,15 @@ test('the Frigorífico tab shows "Para comer primeiro" only when there are fridg
   renderIt('Frigorífico')
   expect(screen.queryByText('Para comer primeiro')).toBeNull()
 })
+
+test('with ?pendentes=1 Casa opens the tab of the products missing a quantity and marks them', () => {
+  data.products = [
+    prod({ id: 'a', name: 'Arroz', location: 'despensa', count: 0, qtyPending: true }),
+    prod({ id: 'b', name: 'Massa', location: 'despensa', count: 2 }),
+    prod({ id: 'c', name: 'Leite', location: 'frigorifico', count: 1 }),
+  ]
+  render(<MemoryRouter initialEntries={['/casa?pendentes=1']}><Casa /></MemoryRouter>)
+  expect(screen.getByRole('tab', { name: 'Despensa' }).getAttribute('aria-selected')).toBe('true')
+  expect(screen.getByText('Arroz').closest('.row')?.className).toContain('pending')
+  expect(screen.getByText('Massa').closest('.row')?.className).not.toContain('pending')
+})

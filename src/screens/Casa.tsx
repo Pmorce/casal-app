@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useCollection } from '../data/useCollection'
 import { useSession } from '../data/session'
 import { useToday } from '../hooks/useToday'
@@ -113,6 +113,9 @@ export default function Casa() {
   const items = useCollection<ShoppingItem>('shopping')
   const bags = unlinkOrphans(useCollection<FreezerBag>('freezerBags'), products)
   const [tab, setTab] = useState<Zone>(savedTab)
+  // from Hoje: "Faltam quantidades de N produtos" opens the tab holding them and marks the rows
+  const highlight = useSearchParams()[0].get('pendentes') === '1'
+  const openedPending = useRef(false)
   const [name, setName] = useState('')
   const [location, setLocation] = useState<Zone>(tab)
   const [qty, setQty] = useState('')
@@ -127,6 +130,15 @@ export default function Casa() {
   // an offer like "Pôr na lista" can stay open a while: it reads the list as it is when tapped
   const itemsRef = useRef(items)
   useEffect(() => { itemsRef.current = items }, [items])
+
+  useEffect(() => {
+    if (!highlight || openedPending.current) return
+    const first = COUNTED_ZONES.find(z => products.some(p => p.location === z && p.qtyPending))
+    if (!first) return
+    openedPending.current = true
+    setTab(first)
+    setLocation(first)
+  }, [highlight, products])
 
   function chooseTab(z: Zone) {
     setTab(z)
@@ -222,7 +234,7 @@ export default function Casa() {
   }
 
   const productRow = (p: Product) => (
-    <ProductRow key={p.id} p={p} model={rowModel(p, items, today, bags)} stale={staleCount(p, today)}
+    <ProductRow key={p.id} p={p} model={rowModel(p, items, today, bags)} marked={highlight && !!p.qtyPending} stale={staleCount(p, today)}
       ask={ask?.id === p.id ? ask.kind : null} menuOpen={menuFor === p.id}
       onMinus={() => minus(p)} onPlus={() => plus(p)}
       onAsk={() => { setMenuFor(null); setAsk({ id: p.id, kind: 'ha' }) }}
@@ -315,6 +327,8 @@ export default function Casa() {
 interface ProductRowProps {
   p: Product
   model: RowModel
+  /** shown from Hoje: this one still needs its quantity */
+  marked: boolean
   stale: boolean
   /** the prompt open under this row, if any */
   ask: Ask['kind'] | null
@@ -330,7 +344,7 @@ interface ProductRowProps {
   onSnooze: () => void
 }
 
-function ProductRow({ p, model, stale, ask, menuOpen, onMinus, onPlus, onAsk, onAnswer, onCancelAsk, onToggleMenu, onFalta, onBuy, onSnooze }: ProductRowProps) {
+function ProductRow({ p, model, marked, stale, ask, menuOpen, onMinus, onPlus, onAsk, onAnswer, onCancelAsk, onToggleMenu, onFalta, onBuy, onSnooze }: ProductRowProps) {
   const { status, note, counted, toCount, rhythmActions, buyInStepper, menu } = model
   const n = shownCount(p)
   const comprei = (className: string) => <button className={className} aria-label={`Comprei ${p.name}`} onClick={onBuy}>Comprei</button>
@@ -338,7 +352,7 @@ function ProductRow({ p, model, stale, ask, menuOpen, onMinus, onPlus, onAsk, on
 
   return (
     <div>
-      <div className="row product">
+      <div className={marked ? 'row product pending' : 'row product'}>
         <span className={`status-dot ${status}`} aria-hidden="true" />
         <div className="grow">
           <div className="product-name">{p.name}<span className="sr-only"> · {STATUS_TITLE[status]}</span></div>

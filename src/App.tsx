@@ -8,6 +8,7 @@ import Hoje from './screens/Hoje'
 import Compras from './screens/Compras'
 import Congelador from './screens/Congelador'
 import Casa from './screens/Casa'
+import ContarCasa from './screens/ContarCasa'
 import Mais from './screens/Mais'
 import './styles.css'
 
@@ -36,6 +37,7 @@ const router = createHashRouter([{
     { path: '/compras', element: <Compras /> },
     { path: '/congelador', element: <Congelador /> },
     { path: '/casa', element: <Casa /> },
+    { path: '/contar', element: <ContarCasa /> },
     { path: '/mais/*', element: <Mais /> },
   ],
 }])
