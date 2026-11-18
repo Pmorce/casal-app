@@ -18,9 +18,9 @@ service cloud.firestore {
 
     match /{col}/{id} {
       allow read: if isMember()
-        && (col in ['shopping', 'products', 'freezerBags', 'chores', 'expenses', 'meta'] || ownerOnly(col));
+        && (col in ['shopping', 'products', 'freezerBags', 'chores', 'expenses', 'meta', 'purchases'] || ownerOnly(col));
       allow write: if isMember()
-        && col in ['shopping', 'products', 'freezerBags', 'chores', 'expenses', 'meta'];
+        && col in ['shopping', 'products', 'freezerBags', 'chores', 'expenses', 'meta', 'purchases'];
       allow create: if isMember() && ownerOnly(col)
         && request.resource.data.ownerUid == request.auth.uid;
       allow update: if isMember() && ownerOnly(col)

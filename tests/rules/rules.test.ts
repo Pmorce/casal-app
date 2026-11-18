@@ -25,7 +25,7 @@ beforeEach(async () => {
 })
 
 const as = (uid: string) => env.authenticatedContext(uid).firestore()
-const SHARED = ['shopping', 'products', 'freezerBags', 'chores', 'expenses', 'meta']
+const SHARED = ['shopping', 'products', 'freezerBags', 'chores', 'expenses', 'meta', 'purchases']
 
 test('unauthenticated cannot read', async () => {
   await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'shopping/a')))

@@ -1,4 +1,4 @@
-import type { Chore, Expense, FreezerBag, Product, Routine, ShoppingItem, Step } from './types'
+import type { Chore, Expense, FreezerBag, Part, Product, Purchase, Routine, ShoppingItem, Step } from './types'
 
 let n = 0
 const nid = () => `id${++n}`
@@ -17,3 +17,7 @@ export const chore = (p: Partial<Chore> = {}): Chore =>
   ({ id: nid(), title: 'Tarefa', kind: 'diaria', createdKey: '2026-01-01', ...p })
 export const exp = (p: Partial<Expense> = {}): Expense =>
   ({ id: nid(), uid: 'P', cents: 100, dateKey: '2026-10-01', ...p })
+export const purchase = (p: Partial<Purchase> = {}): Purchase =>
+  ({ id: nid(), name: 'Leite', dateKey: '2026-10-01', by: 'Ana', finishId: 'f1', ...p })
+export const part = (p: Partial<Part> = {}): Part =>
+  ({ id: nid(), productId: 'p1', name: 'Bifes', amount: 500, unit: 'g', ...p })

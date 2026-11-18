@@ -10,7 +10,21 @@ export interface ShoppingItem {
   productId?: string
   /** "Só desta vez": bought once, never becomes a Casa product */
   oneOff?: true
+  /** where it was put in the cart (set when ticked during a trip) */
+  store?: string
+  /** a generic item (e.g. meat) holds the concrete parts put in the cart */
+  parts?: Part[]
   createdAt?: unknown
+}
+
+/** One concrete thing put in the cart under a generic item. */
+export interface Part {
+  id: string
+  productId: string
+  name: string
+  amount: number
+  unit: FreezerUnit
+  store?: string
 }
 
 /** Casa zone; also how the shopping list is grouped in the supermarket. */
@@ -27,6 +41,8 @@ export interface Product {
   /** "Ainda há" taps since the last purchase */
   snoozeCount?: number
   /** zone congelador only: which freezer tab its bags go to (else guessed from the name) */
+  /** a generic product (e.g. meat): buying it asks "o que levas?" */
+  generic?: true
   freezerCategory?: 'carne' | 'outros'
   /** zone congelador only: amount of the last entry, to pre-fill the next one */
   freezerLast?: { amount: number; unit: FreezerUnit; key?: DateKey }
@@ -63,6 +79,29 @@ export interface Expense {
   cents: number
   dateKey: DateKey
   note?: string
+  store?: string
+}
+
+/** Doc meta/trip: the shared "ida às compras". */
+export interface Trip {
+  id: string
+  store: string
+  stores: string[]
+  startedBy: string
+  dateKey: DateKey
+}
+
+/** What was bought, where and when (collection purchases). */
+export interface Purchase {
+  id: string
+  name: string
+  productId?: string
+  store?: string
+  dateKey: DateKey
+  by: string
+  amount?: number
+  unit?: FreezerUnit
+  finishId: string
 }
 
 export interface Step {
