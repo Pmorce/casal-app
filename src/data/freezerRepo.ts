@@ -2,7 +2,8 @@ import { collection, deleteDoc, deleteField, doc, serverTimestamp, setDoc, updat
 import { db } from './firebase'
 import { fire } from './write'
 import { cleanText } from '../domain/shopping'
-import { oldestBag, type FreezerGroup } from '../domain/freezer'
+import { oldestBag, type BagOrigin, type FreezerGroup } from '../domain/freezer'
+import { recordPurchase } from '../domain/rhythm'
 import { freezerCategoryOf } from '../domain/zones'
 import type { DateKey } from '../domain/dates'
 import type { FreezerBag, FreezerUnit, Product } from '../domain/types'
@@ -51,6 +52,70 @@ export function restoreBag(b: FreezerBag): void {
 export function addSameAsLast(g: FreezerGroup, today: DateKey): void {
   const last = g.bags[g.bags.length - 1]
   addBags({ name: last.name, category: last.category, amount: last.amount, unit: last.unit, count: 1, productId: last.productId }, today)
+}
+
+/** "Descongelar": the bag goes to the fridge, from today. */
+export function moveToFridge(b: FreezerBag, today: DateKey): void {
+  fire(updateDoc(doc(db, 'freezerBags', b.id), { where: 'frigorifico', movedKey: today }))
+}
+
+/** "Voltar ao congelador" (and undo of "Descongelar"): only the two fields go. */
+export function backToFreezer(b: FreezerBag): void {
+  fire(updateDoc(doc(db, 'freezerBags', b.id), { where: deleteField(), movedKey: deleteField() }))
+}
+
+export interface FromOrigin {
+  bagId: string
+  /** 'comprei' only */
+  purchaseId?: string
+  /** 'comprei' with a product: its fields as they were, for undo */
+  previous?: Pick<Product, 'id' | 'boughtKeys' | 'freezerLast'>
+}
+
+/**
+ * "+" → "De onde veio?": one bag like the newest of the group, with the amount given, entered today.
+ * - 'comprei' also writes a `purchases` row and the product's purchase day and last amount (quiet, on its own).
+ * - 'cozinhei' makes it comida feita; the link to a bought product is dropped (it is not that product's stock).
+ * - 'ofereceram' is the bag only.
+ */
+export function addFromOrigin(
+  g: FreezerGroup, origin: BagOrigin, amount: number, today: DateKey,
+  opts: { uid: string; store?: string; product?: Product },
+): FromOrigin {
+  if (!(amount > 0)) throw new Error('Quantidade inválida')
+  const last = g.bags[g.bags.length - 1]
+  const category = origin === 'cozinhei' ? 'feita' : last.category
+  const ref = newBagRef()
+  fire(setDoc(ref, {
+    name: last.name, category, amount, unit: last.unit, addedKey: today, createdAt: serverTimestamp(),
+    ...link(category === last.category ? last.productId : undefined),
+  }))
+  if (origin !== 'comprei') return { bagId: ref.id }
+  const { product, store } = opts
+  const purchase = doc(collection(db, 'purchases'))
+  fire(setDoc(purchase, {
+    name: product?.name ?? last.name, ...(product ? { productId: product.id } : {}), ...(store ? { store } : {}),
+    dateKey: today, by: opts.uid, amount, unit: last.unit, finishId: doc(collection(db, 'purchases')).id, createdAt: serverTimestamp(),
+  }))
+  if (!product) return { bagId: ref.id, purchaseId: purchase.id }
+  fire(updateDoc(doc(db, 'products', product.id), {
+    boughtKeys: recordPurchase(product.boughtKeys, today), freezerLast: { amount, unit: last.unit, key: today },
+  }), { quiet: true })
+  const previous: FromOrigin['previous'] = {
+    id: product.id, ...(product.boughtKeys ? { boughtKeys: product.boughtKeys } : {}), ...(product.freezerLast ? { freezerLast: product.freezerLast } : {}),
+  }
+  return { bagId: ref.id, purchaseId: purchase.id, previous }
+}
+
+export function undoOrigin(done: FromOrigin): void {
+  deleteBag(done.bagId)
+  if (done.purchaseId) fire(deleteDoc(doc(db, 'purchases', done.purchaseId)))
+  const p = done.previous
+  if (p) {
+    fire(updateDoc(doc(db, 'products', p.id), {
+      boughtKeys: p.boughtKeys ?? deleteField(), freezerLast: p.freezerLast ?? deleteField(),
+    }), { quiet: true })
+  }
 }
 
 export function updateBag(b: FreezerBag, changes: Partial<Pick<FreezerBag, 'amount' | 'addedKey'>>): void {

@@ -16,10 +16,14 @@ const freezer = vi.hoisted(() => ({
   removeOldest: vi.fn((g: { bags: FreezerBag[] }) => g.bags[0]),
   splitBag: vi.fn((_b: FreezerBag, amounts: number[]) => amounts.map((_, i) => `s${i}`)),
   deleteBags: vi.fn(),
+  moveToFridge: vi.fn(), backToFreezer: vi.fn(), undoOrigin: vi.fn(),
+  addFromOrigin: vi.fn(() => ({ bagId: 'nb' })),
 }))
 vi.mock('../data/freezerRepo', () => freezer)
 const shop = vi.hoisted(() => ({ addItem: vi.fn(), markMissing: vi.fn(), snooze: vi.fn() }))
 vi.mock('../data/shoppingRepo', () => shop)
+const trips = vi.hoisted(() => ({ addCustomStore: vi.fn() }))
+vi.mock('../data/tripRepo', () => trips)
 
 const renderIt = () => render(<MemoryRouter><Congelador /></MemoryRouter>)
 beforeEach(() => { vi.clearAllMocks(); data.products = []; data.shopping = []; data.bags = [] })
@@ -111,12 +115,18 @@ test('Dividir never goes over the total: the button turns off and says why', () 
   expect(freezer.splitBag).not.toHaveBeenCalled()
 })
 
+/** "−" opens "Para onde vai?"; then one of its options. */
+const takeOut = (name: string, option: string) => {
+  fireEvent.click(screen.getByRole('button', { name: `Tirar um saco de ${name}` }))
+  fireEvent.click(screen.getByRole('button', { name: option }))
+}
+
 const lastBagOfVaca = () => {
   const v = prod({ id: 'v', name: 'Vaca', location: 'congelador' })
   data.products = [v]
   data.bags = [bag({ name: 'Vaca', productId: 'v' })]
   renderIt()
-  fireEvent.click(screen.getByRole('button', { name: 'Tirar um saco de Vaca' }))
+  takeOut('Vaca', 'Acabou / deitar fora')
   return v
 }
 
@@ -151,7 +161,7 @@ test('Desfazer on "Acabou X" puts the bag back and asks nothing else', () => {
 test('a bag that is not the last keeps the plain "Saco retirado" toast', () => {
   data.bags = [bag({ name: 'Vaca' }), bag({ name: 'Vaca' })]
   renderIt()
-  fireEvent.click(screen.getByRole('button', { name: 'Tirar um saco de Vaca' }))
+  takeOut('Vaca', 'Acabou / deitar fora')
   expect(screen.getByText('Saco retirado')).toBeTruthy()
   expect(screen.queryByRole('button', { name: 'Pôr na lista' })).toBeNull()
 })
@@ -159,7 +169,7 @@ test('a bag that is not the last keeps the plain "Saco retirado" toast', () => {
 test('last bag with no product still adds the name to the list', () => {
   data.bags = [bag({ name: 'Sopa', category: 'carne' })]
   renderIt()
-  fireEvent.click(screen.getByRole('button', { name: 'Tirar um saco de Sopa' }))
+  takeOut('Sopa', 'Acabou / deitar fora')
   fireEvent.click(screen.getByRole('button', { name: 'Pôr na lista' }))
   expect(shop.addItem).toHaveBeenCalledWith('Sopa', 'P', [], [], 'despensa')
 })
@@ -207,7 +217,7 @@ test('"Pôr na lista" uses the list as it is now, not as it was when the bag was
   data.products = [v]
   data.bags = [bag({ name: 'Vaca', productId: 'v' })]
   const { rerender } = renderIt()
-  fireEvent.click(screen.getByRole('button', { name: 'Tirar um saco de Vaca' }))
+  takeOut('Vaca', 'Acabou / deitar fora')
   const added = item({ text: 'Vaca', productId: 'v' })
   data.shopping = [added] // the other phone tapped "Falta" meanwhile
   rerender(<MemoryRouter><Congelador /></MemoryRouter>)
@@ -246,4 +256,117 @@ test('the group stepper live region says «1 saco» in the singular', () => {
   renderIt()
   const live = screen.getByRole('button', { name: 'Mais um saco de Bolonhesa' }).previousElementSibling!
   expect(live.querySelector('.sr-only')?.textContent).toBe('1 saco de Bolonhesa')
+})
+
+test('"−" → Descongelar moves the oldest bag to the fridge; Desfazer brings it back to the freezer', () => {
+  const old = bag({ name: 'Vaca', addedKey: '2026-05-01' })
+  data.bags = [bag({ name: 'Vaca', addedKey: '2026-10-01' }), old]
+  renderIt()
+  takeOut('Vaca', 'Descongelar')
+  expect(freezer.moveToFridge).toHaveBeenCalledWith(old, '2026-10-29')
+  expect(freezer.removeOldest).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Desfazer' }))
+  expect(freezer.backToFreezer).toHaveBeenCalledWith(old)
+  expect(freezer.restoreBag).not.toHaveBeenCalled()
+})
+
+test('"Para onde vai?" offers its options and Cancelar does nothing', () => {
+  data.bags = [bag({ name: 'Vaca' })]
+  renderIt()
+  fireEvent.click(screen.getByRole('button', { name: 'Tirar um saco de Vaca' }))
+  expect(screen.getByText('Para onde vai?')).toBeTruthy()
+  for (const o of ['Descongelar', 'Cozinhar já', 'Acabou / deitar fora']) expect(screen.getByRole('button', { name: o })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+  expect(screen.queryByText('Para onde vai?')).toBeNull()
+  expect(freezer.moveToFridge).not.toHaveBeenCalled()
+  expect(freezer.removeOldest).not.toHaveBeenCalled()
+  expect(screen.queryByRole('button', { name: 'Desfazer' })).toBeNull()
+})
+
+test('"−" on the only bag → Descongelar also says "Acabou Vaca" with "Pôr na lista"; Desfazer brings it back to the freezer', () => {
+  const v = prod({ id: 'v', name: 'Vaca', location: 'congelador' })
+  const only = bag({ name: 'Vaca', productId: 'v' })
+  data.products = [v]
+  data.bags = [only]
+  renderIt()
+  takeOut('Vaca', 'Descongelar')
+  expect(screen.getByText('Acabou Vaca').closest('.toast')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Desfazer' }))
+  expect(freezer.backToFreezer).toHaveBeenCalledWith(only)
+  expect(freezer.restoreBag).not.toHaveBeenCalled()
+})
+
+test('"−" on the only bag → Descongelar: "Pôr na lista" puts the product on the list', () => {
+  const v = prod({ id: 'v', name: 'Vaca', location: 'congelador' })
+  data.products = [v]
+  data.bags = [bag({ name: 'Vaca', productId: 'v' })]
+  renderIt()
+  takeOut('Vaca', 'Descongelar')
+  fireEvent.click(screen.getByRole('button', { name: 'Pôr na lista' }))
+  expect(shop.markMissing).toHaveBeenCalledWith(v, 'P', [])
+})
+
+test('"Cozinhar já" takes the bag out with undo, and the last one still asks for the list', () => {
+  data.bags = [bag({ name: 'Vaca' })]
+  renderIt()
+  takeOut('Vaca', 'Cozinhar já')
+  expect(freezer.removeOldest).toHaveBeenCalledTimes(1)
+  expect(screen.getByText('Acabou Vaca')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Desfazer' }))
+  expect(freezer.restoreBag).toHaveBeenCalled()
+})
+
+test('a bag thawing in the fridge is not in the Congelador, nor in the header count', () => {
+  data.bags = [
+    bag({ name: 'Vaca' }), bag({ name: 'Frango', where: 'frigorifico', movedKey: '2026-10-28' }),
+    bag({ name: 'Vaca', where: 'frigorifico', movedKey: '2026-10-28' }),
+  ]
+  renderIt()
+  expect(screen.getByText('1 saco')).toBeTruthy()
+  expect(screen.queryByText('Frango')).toBeNull()
+  const live = screen.getByRole('button', { name: 'Mais um saco de Vaca' }).previousElementSibling!
+  expect(live.querySelector('.sr-only')?.textContent).toBe('1 saco de Vaca')
+})
+
+test('"+" → Comprei 3 kg Lidl adds the bag from that purchase, with undo', () => {
+  const v = prod({ id: 'v', name: 'Vaca', location: 'congelador' })
+  data.products = [v]
+  data.bags = [
+    bag({ name: 'Vaca', amount: 1, unit: 'kg', productId: 'v', addedKey: '2026-05-01' }),
+    bag({ name: 'Vaca', amount: 2, unit: 'kg', productId: 'v' }),
+  ]
+  renderIt()
+  fireEvent.click(screen.getByRole('button', { name: 'Mais um saco de Vaca' }))
+  expect(screen.getByText('De onde veio?')).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'Comprei' }).getAttribute('aria-pressed')).toBe('true')
+  const amount = screen.getByLabelText('Quantidade (kg)') as HTMLInputElement
+  expect(amount.value).toBe('2') // the newest bag
+  fireEvent.change(amount, { target: { value: '3' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Lidl' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+  expect(freezer.addFromOrigin).toHaveBeenCalledWith(expect.objectContaining({ name: 'Vaca' }), 'comprei', 3, '2026-10-29',
+    expect.objectContaining({ uid: 'P', store: 'Lidl', product: v }))
+  expect(freezer.addSameAsLast).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Desfazer' }))
+  expect(freezer.undoOrigin).toHaveBeenCalledWith({ bagId: 'nb' })
+})
+
+test('"+" in Comida feita defaults to Cozinhei and shows no store', () => {
+  data.bags = [bag({ name: 'Sopa', category: 'feita', amount: 2, unit: 'doses' })]
+  renderIt()
+  fireEvent.click(screen.getByRole('button', { name: 'Comida feita' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Mais um saco de Sopa' }))
+  expect(screen.getByRole('button', { name: 'Cozinhei' }).getAttribute('aria-pressed')).toBe('true')
+  expect(screen.queryByRole('button', { name: 'Lidl' })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+  expect(freezer.addFromOrigin).toHaveBeenCalledWith(expect.objectContaining({ name: 'Sopa' }), 'cozinhei', 2, '2026-10-29', { uid: 'P' })
+})
+
+test('"+" → Cancelar adds nothing', () => {
+  data.bags = [bag({ name: 'Vaca' })]
+  renderIt()
+  fireEvent.click(screen.getByRole('button', { name: 'Mais um saco de Vaca' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+  expect(screen.queryByText('De onde veio?')).toBeNull()
+  expect(freezer.addFromOrigin).not.toHaveBeenCalled()
 })

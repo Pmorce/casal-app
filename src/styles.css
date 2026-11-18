@@ -307,6 +307,11 @@ h2 { font-size: 16px; font-weight: 800; margin: 18px 0 8px; }
 .split-row { margin-top: 6px; }
 .split-label { flex: 0 0 64px; font-size: 14px; color: var(--muted); }
 .form-actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 8px; }
+/* Para onde vai? / De onde veio?: inline under the group row, like Corrigir and Dividir */
+.sheet { border-top: 1px solid var(--line); margin-top: 8px; padding-top: 10px; }
+.sheet .seg { margin: 8px 0; }
+.sheet .inline { margin-bottom: 8px; }
+.sheet-options { display: grid; gap: 8px; margin-top: 8px; }
 /* Para o congelador: one row per product, the amount beside the name and the units under it */
 .freeze-row { margin-bottom: 12px; }
 .freeze-head { display: flex; align-items: center; gap: 8px; }

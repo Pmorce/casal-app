@@ -1,4 +1,4 @@
-import { addBags, addSameAsLast, deleteBags, freezeBought, removeOldest, splitBag, undoFreeze } from './freezerRepo'
+import { addBags, addFromOrigin, addSameAsLast, backToFreezer, deleteBags, freezeBought, moveToFridge, removeOldest, splitBag, undoFreeze, undoOrigin } from './freezerRepo'
 import { groupBags } from '../domain/freezer'
 import { bag, prod } from '../domain/testFactories'
 
@@ -9,16 +9,22 @@ const fs = vi.hoisted(() => ({
   commit: vi.fn(async () => {}),
   deleteDoc: vi.fn(async () => {}),
   updateDoc: vi.fn(async (_ref: unknown, _data: unknown) => {}),
+  setDoc: vi.fn(async (_ref: unknown, _data: unknown) => {}),
   n: 0,
 }))
 vi.mock('./firebase', () => ({ db: {} }))
 vi.mock('firebase/firestore', async () => ({
-  collection: vi.fn(() => 'bagsRef'),
-  doc: vi.fn((...args: unknown[]) => ({ id: String(args[2] ?? `new${++fs.n}`), path: args.slice(1).join('/') || 'new' })),
+  collection: vi.fn((_db: unknown, name: string) => name),
+  // doc(collection) → a new id in that collection; doc(db, collection, id) → that document
+  doc: vi.fn((...args: unknown[]) => {
+    if (args.length === 1) { const id = `new${++fs.n}`; return { id, path: `${String(args[0])}/${id}` } }
+    return { id: String(args[2]), path: args.slice(1).join('/') }
+  }),
   writeBatch: () => ({ set: fs.set, update: fs.update, delete: fs.delete, commit: fs.commit }),
   deleteField: () => 'DEL',
   deleteDoc: fs.deleteDoc,
   updateDoc: fs.updateDoc,
+  setDoc: fs.setDoc,
   serverTimestamp: () => 'now',
 }))
 
@@ -145,4 +151,79 @@ test('freezeBought writes the amount into the purchase (quiet, on its own); undo
   undoFreeze(done)
   expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'purchases/pu1' }), { amount: 2, unit: 'kg' })
   expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'purchases/pu2' }), { amount: 'DEL', unit: 'DEL' })
+})
+
+test('moveToFridge marks the bag as thawing since today; backToFreezer removes both fields', () => {
+  const b = bag({ id: 'b1' })
+  moveToFridge(b, '2026-11-18')
+  expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'freezerBags/b1' }), { where: 'frigorifico', movedKey: '2026-11-18' })
+  backToFreezer(b)
+  expect(fs.updateDoc).toHaveBeenLastCalledWith(expect.objectContaining({ path: 'freezerBags/b1' }), { where: 'DEL', movedKey: 'DEL' })
+})
+
+const purchaseWrites = () => fs.setDoc.mock.calls.filter(c => (c[0] as { path: string }).path.startsWith('purchases/'))
+const bagWrites = () => fs.set.mock.calls.concat(fs.setDoc.mock.calls).filter(c => (c[0] as { path: string }).path.startsWith('freezerBags/'))
+
+test("addFromOrigin 'comprei': the bag, a purchase row with amount, unit and store, and the product's rhythm and last amount", () => {
+  const v = prod({ id: 'v', name: 'Vaca', location: 'congelador', boughtKeys: ['2026-10-01'] })
+  const g = groupBags([bag({ name: 'Vaca', amount: 1, unit: 'kg', productId: 'v' })])[0]
+  const done = addFromOrigin(g, 'comprei', 3, '2026-11-18', { uid: 'P', store: 'Lidl', product: v })
+  expect(bagWrites()).toHaveLength(1)
+  expect(bagWrites()[0][1]).toEqual(expect.objectContaining({ name: 'Vaca', category: 'carne', amount: 3, unit: 'kg', addedKey: '2026-11-18', productId: 'v' }))
+  expect(purchaseWrites()).toHaveLength(1)
+  const row = purchaseWrites()[0][1] as Record<string, unknown>
+  expect(row).toEqual(expect.objectContaining({ name: 'Vaca', productId: 'v', store: 'Lidl', dateKey: '2026-11-18', by: 'P', amount: 3, unit: 'kg' }))
+  expect(typeof row.finishId).toBe('string')
+  expect(Object.values(row)).not.toContain(undefined)
+  expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'products/v' }),
+    { boughtKeys: ['2026-10-01', '2026-11-18'], freezerLast: { amount: 3, unit: 'kg', key: '2026-11-18' } })
+  expect(done.purchaseId).toBe((purchaseWrites()[0][0] as { id: string }).id)
+  expect(done.previous).toEqual({ id: 'v', boughtKeys: ['2026-10-01'] })
+})
+
+test("addFromOrigin 'comprei' without store or product writes no undefined fields", () => {
+  const g = groupBags([bag({ name: 'Gelado', category: 'outros', amount: 1, unit: 'un' })])[0]
+  addFromOrigin(g, 'comprei', 2, '2026-11-18', { uid: 'P' })
+  const row = purchaseWrites()[0][1] as Record<string, unknown>
+  expect(row).not.toHaveProperty('store')
+  expect(row).not.toHaveProperty('productId')
+  expect(Object.values(row)).not.toContain(undefined)
+  expect(fs.updateDoc).not.toHaveBeenCalled()
+})
+
+test("addFromOrigin 'ofereceram' writes only the bag, no purchase", () => {
+  const v = prod({ id: 'v', name: 'Vaca', location: 'congelador' })
+  const g = groupBags([bag({ name: 'Vaca', amount: 1, unit: 'kg', productId: 'v' })])[0]
+  const done = addFromOrigin(g, 'ofereceram', 2, '2026-11-18', { uid: 'P', store: 'Lidl', product: v })
+  expect(bagWrites()).toHaveLength(1)
+  expect(purchaseWrites()).toHaveLength(0)
+  expect(fs.updateDoc).not.toHaveBeenCalled()
+  expect(done.purchaseId).toBeUndefined()
+  expect(done.previous).toBeUndefined()
+})
+
+test("addFromOrigin 'cozinhei' writes a comida feita bag, without the bought product's link", () => {
+  const g = groupBags([bag({ name: 'Vaca', amount: 1, unit: 'kg', productId: 'v' })])[0]
+  addFromOrigin(g, 'cozinhei', 4, '2026-11-18', { uid: 'P' })
+  expect(bagWrites()[0][1]).toEqual(expect.objectContaining({ name: 'Vaca', category: 'feita', amount: 4, unit: 'kg', addedKey: '2026-11-18' }))
+  expect(bagWrites()[0][1]).not.toHaveProperty('productId')
+  expect(purchaseWrites()).toHaveLength(0)
+})
+
+test('addFromOrigin refuses an amount that is not above 0', () => {
+  const g = groupBags([bag({ name: 'Vaca' })])[0]
+  expect(() => addFromOrigin(g, 'comprei', 0, '2026-11-18', { uid: 'P' })).toThrow()
+  expect(bagWrites()).toHaveLength(0)
+  expect(purchaseWrites()).toHaveLength(0)
+})
+
+test('undoOrigin deletes the bag and the purchase and puts the product back as it was', () => {
+  const v = prod({ id: 'v', name: 'Vaca', location: 'congelador' })
+  const g = groupBags([bag({ name: 'Vaca', amount: 1, unit: 'kg', productId: 'v' })])[0]
+  const done = addFromOrigin(g, 'comprei', 3, '2026-11-18', { uid: 'P', product: v })
+  vi.clearAllMocks()
+  undoOrigin(done)
+  expect(fs.deleteDoc).toHaveBeenCalledWith(expect.objectContaining({ path: `freezerBags/${done.bagId}` }))
+  expect(fs.deleteDoc).toHaveBeenCalledWith(expect.objectContaining({ path: `purchases/${done.purchaseId}` }))
+  expect(fs.updateDoc).toHaveBeenCalledWith(expect.objectContaining({ path: 'products/v' }), { boughtKeys: 'DEL', freezerLast: 'DEL' })
 })

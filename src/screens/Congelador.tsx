@@ -2,16 +2,25 @@ import { useCallback, useState, type FormEvent } from 'react'
 import { useCollection } from '../data/useCollection'
 import { useSession } from '../data/session'
 import { useToday } from '../hooks/useToday'
-import { addSameAsLast, deleteBag, deleteBags, removeOldest, restoreBag, splitBag, updateBag } from '../data/freezerRepo'
+import {
+  addFromOrigin, backToFreezer, deleteBag, deleteBags, moveToFridge, removeOldest, restoreBag, splitBag, undoOrigin, updateBag,
+} from '../data/freezerRepo'
+import { addCustomStore } from '../data/tripRepo'
 import { addItem, markMissing, snooze } from '../data/shoppingRepo'
 import { guessZone } from '../domain/zones'
 import { findProduct } from '../domain/shopping'
-import { CATEGORIES, groupBags, isOld, maxSplit, parseAmount, splitAmounts, splitWithRest, summary, type FreezerGroup } from '../domain/freezer'
-import { daysBetween, type DateKey } from '../domain/dates'
-import type { FreezerBag, Product, ShoppingItem } from '../domain/types'
+import {
+  CATEGORIES, groupBags, isOld, maxSplit, oldestBag, parseAmount, splitAmounts, splitWithRest, summary, type BagOrigin, type FreezerGroup,
+} from '../domain/freezer'
+import { addDays, daysBetween, type DateKey } from '../domain/dates'
+import { inFreezer } from '../domain/stock'
+import { customStores, storeOptions } from '../domain/stores'
+import type { FreezerBag, Product, Purchase, ShoppingItem } from '../domain/types'
 import UndoToast from '../components/UndoToast'
 import PageHeader from '../components/PageHeader'
 import Icon, { Badge, type IconName, type Tone } from '../components/Icon'
+import WhereSheet, { type WhereTo } from '../components/WhereSheet'
+import OriginSheet from '../components/OriginSheet'
 import NovoSaco from './NovoSaco'
 
 const num = new Intl.NumberFormat('pt-PT', { maximumFractionDigits: 2 })
@@ -42,9 +51,13 @@ function age(addedKey: string, today: string): string {
 export default function Congelador() {
   const { uid } = useSession()
   const today = useToday()
-  const bags = useCollection<FreezerBag>('freezerBags')
+  // the Congelador is only what is in the freezer: bags thawing in the fridge are elsewhere (spec §5.4)
+  const allBags = useCollection<FreezerBag>('freezerBags')
+  const bags = inFreezer(allBags)
   const products = useCollection<Product>('products')
   const items = useCollection<ShoppingItem>('shopping')
+  const meta = useCollection<{ id: string }>('meta')
+  const purchases = useCollection<Purchase>('purchases', ['dateKey', '>=', addDays(today, -365)])
   const [category, setCategory] = useState<FreezerBag['category']>('carne')
   const [adding, setAdding] = useState(false)
   const [open, setOpen] = useState<string | null>(null)
@@ -52,18 +65,47 @@ export default function Congelador() {
   const [undo, setUndo] = useState<{ message: string; run: () => void; ended?: FreezerGroup } | null>(null)
   const [fixing, setFixing] = useState<string | null>(null)
   const [splitting, setSplitting] = useState<string | null>(null)
+  // the group whose "−" or "+" asked its question; found again at render, so a group gone meanwhile closes it
+  const [sheet, setSheet] = useState<{ kind: 'where' | 'origin'; key: string } | null>(null)
   const closeUndo = useCallback(() => setUndo(null), [])
   const ended = undo?.ended
 
   const groups = groupBags(bags).filter(g => g.category === category)
-  const names = [...new Set(bags.map(b => b.name))]
+  const names = [...new Set(allBags.map(b => b.name))]
 
-  function minus(g: FreezerGroup) {
+  /** After a bag left the freezer: the last one asks "Acabou X" at the bottom, always in view (a card at the top was missed). */
+  function left(g: FreezerGroup, wasLast: boolean, message: string, run: () => void) {
+    setUndo(wasLast ? { message: `Acabou ${g.name}`, run, ended: g } : { message, run })
+  }
+
+  /** "Para onde vai?" for the oldest bag (first in, first out). */
+  function where(g: FreezerGroup, to: WhereTo) {
+    setSheet(null)
     const wasLast = g.bags.length === 1
+    if (to === 'descongelar') {
+      const bag = oldestBag(g)
+      moveToFridge(bag, today)
+      return left(g, wasLast, 'A descongelar no frigorífico', () => backToFreezer(bag))
+    }
     const bag = removeOldest(g)
-    if (!wasLast) return setUndo({ message: 'Saco retirado', run: () => restoreBag(bag) })
-    // the last one: asked at the bottom of the screen, always in view (a card at the top was missed)
-    setUndo({ message: `Acabou ${g.name}`, run: () => restoreBag(bag), ended: g })
+    if (to === 'cozinhar') return cookNow(g, bag, wasLast)
+    left(g, wasLast, 'Saco retirado', () => restoreBag(bag))
+  }
+
+  /**
+   * "Cozinhar já": the bag is out. Hook for Task 6: open the CookedForm here with `madeFrom` from this bag, and
+   * show the last-bag "Acabou X" only after it closes (never two at once, spec §5.11). Until then it is like "Acabou".
+   */
+  function cookNow(g: FreezerGroup, bag: FreezerBag, wasLast: boolean) {
+    left(g, wasLast, 'Saco retirado', () => restoreBag(bag))
+  }
+
+  /** "De onde veio?": a new bag like the newest one; "Comprei" also records the purchase. */
+  function origin(g: FreezerGroup, from: BagOrigin, amount: number, store?: string) {
+    setSheet(null)
+    const product = productOf(g)
+    const done = addFromOrigin(g, from, amount, today, { uid, ...(store ? { store } : {}), ...(from === 'comprei' && product ? { product } : {}) })
+    setUndo({ message: 'Saco guardado', run: () => undoOrigin(done) })
   }
 
   /** The Casa product the group stands for: linked by its bags, else one with the same name. */
@@ -117,11 +159,21 @@ export default function Congelador() {
                 </button>
                 {/* − {bags} +: one round selector, its buttons keep a 44px hit area */}
                 <span className="stepper">
-                  <button aria-label={`Tirar um saco de ${g.name}`} onClick={() => minus(g)}><Icon name="menos" /></button>
+                  <button aria-label={`Tirar um saco de ${g.name}`} onClick={() => setSheet({ kind: 'where', key: g.key })}><Icon name="menos" /></button>
                   <b aria-live="polite" aria-atomic="true"><span aria-hidden="true">{g.bags.length}</span><span className="sr-only">{g.bags.length} {g.bags.length === 1 ? 'saco' : 'sacos'} de {g.name}</span></b>
-                  <button aria-label={`Mais um saco de ${g.name}`} onClick={() => addSameAsLast(g, today)}><Icon name="mais1" /></button>
+                  <button aria-label={`Mais um saco de ${g.name}`} onClick={() => setSheet({ kind: 'origin', key: g.key })}><Icon name="mais1" /></button>
                 </span>
               </div>
+              {sheet?.key === g.key && sheet.kind === 'where' && (
+                <WhereSheet bag={oldest} onPick={to => where(g, to)} onCancel={() => setSheet(null)} />
+              )}
+              {sheet?.key === g.key && sheet.kind === 'origin' && (
+                <OriginSheet name={g.name} unit={g.bags[g.bags.length - 1].unit} initialAmount={g.bags[g.bags.length - 1].amount}
+                  defaultOrigin={g.category === 'feita' ? 'cozinhei' : 'comprei'}
+                  stores={storeOptions(customStores(meta), purchases)}
+                  onAddCustom={name => addCustomStore(name, customStores(meta))}
+                  onSave={(from, amount, store) => origin(g, from, amount, store)} onCancel={() => setSheet(null)} />
+              )}
               {open === g.key && (
                 <div className="bags">
                   {g.bags.map((b, i) => {

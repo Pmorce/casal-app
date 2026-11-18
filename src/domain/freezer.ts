@@ -33,6 +33,9 @@ const num = new Intl.NumberFormat('pt-PT', { maximumFractionDigits: 2 })
 /** pt-PT amount ("2,5"), at most two decimals. */
 export const formatAmount = (n: number): string => num.format(n).replace(/\s/g, '')
 
+/** "De onde veio?": where a new bag of a group came from. */
+export type BagOrigin = 'comprei' | 'cozinhei' | 'ofereceram'
+
 export function parseAmount(s: string): number | null {
   const t = s.trim().replace(',', '.')
   if (!/^(\d+(\.\d*)?|\.\d+)$/.test(t)) return null // ",5" is 0,5; "12," is 12
