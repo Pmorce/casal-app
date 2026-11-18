@@ -26,7 +26,7 @@ export default function MeatCard({ item, own, products, store, onClose }: Props)
   const first = types[0]
   const [typeId, setTypeId] = useState(first ? first.id : OUTRO)
   const [other, setOther] = useState('')
-  const [{ amount, unit }, setQty] = useState<{ amount: string; unit: FreezerUnit }>(first ? freezeDefaults(first) : { amount: '', unit: 'kg' })
+  const [{ amount, unit }, setQty] = useState<{ amount: string; unit: FreezerUnit }>(first ? freezeDefaults(first) : { amount: '', unit: 'un' })
   const parts = item.parts ?? []
   const type = types.find(t => t.id === typeId)
   const value = parseAmount(amount)
@@ -39,7 +39,8 @@ export default function MeatCard({ item, own, products, store, onClose }: Props)
 
   function pickOther() {
     setTypeId(OUTRO)
-    setQty({ amount: '', unit: 'kg' })
+    // a new type has no last amount: start in units (almôndegas, hambúrgueres…); kg is one tap away
+    setQty({ amount: '', unit: 'un' })
   }
 
   function put(e: FormEvent) {

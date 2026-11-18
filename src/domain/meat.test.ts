@@ -30,6 +30,15 @@ test('a generic own product is not offered as a type', () => {
   expect(meatTypes(carne, [carne])).toEqual([])
 })
 
+test('family words (Carne, Carnes, Peixe, Peixes, Talho) are never offered as a type, even before being generic', () => {
+  const carne = prod({ id: 'c', name: 'Carne', location: 'congelador', freezerCategory: 'carne' })
+  const peixes = prod({ id: 'p', name: 'peixes', location: 'congelador', freezerCategory: 'carne' })
+  const talho = prod({ id: 't', name: 'Talho', location: 'congelador', freezerCategory: 'carne' })
+  const vaca = prod({ id: 'v', name: 'Vaca', location: 'congelador', freezerCategory: 'carne' })
+  expect(meatTypes(carne, [carne, peixes, talho, vaca]).map(p => p.name)).toEqual(['Vaca'])
+  expect(meatTypes(vaca, [carne, peixes, talho, vaca]).map(p => p.name)).toEqual(['Vaca'])
+})
+
 test('partsLine says what is in the cart, pt-PT numbers and unit labels', () => {
   expect(partsLine([part({ name: 'Vaca', amount: 2.5, unit: 'kg' }), part({ name: 'Almôndegas', amount: 6, unit: 'un' })]))
     .toBe('2,5 kg Vaca · 6 un. Almôndegas')

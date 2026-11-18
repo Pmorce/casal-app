@@ -1,4 +1,4 @@
-import { addDoc, collection, deleteDoc, deleteField, doc, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore'
+import { addDoc, arrayRemove, arrayUnion, collection, deleteDoc, deleteField, doc, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore'
 import { db } from './firebase'
 import { fire } from './write'
 import { cleanText, findProduct, isOnList, normalize } from '../domain/shopping'
@@ -84,13 +84,17 @@ export function toggleCart(item: ShoppingItem, store?: string): void {
 export function addPart(item: ShoppingItem, part: Omit<Part, 'id'>): void {
   const { store, ...rest } = part
   const added: Part = { id: doc(collection(db, 'shopping')).id, ...rest, ...(store ? { store } : {}) }
-  fire(updateDoc(doc(db, 'shopping', item.id), { parts: [...(item.parts ?? []), added], status: 'carrinho' }))
+  // only the new part is sent: a whole array written from one phone's copy would wipe a part the other
+  // phone added meanwhile (seen with one phone offline in the supermarket)
+  fire(updateDoc(doc(db, 'shopping', item.id), { parts: arrayUnion(added), status: 'carrinho' }))
 }
 
 /** ✕ on a part; without parts left the item is no longer in the cart. */
 export function removePart(item: ShoppingItem, partId: string): void {
+  const gone = (item.parts ?? []).find(p => p.id === partId)
+  if (!gone) return
   const left = (item.parts ?? []).filter(p => p.id !== partId)
-  fire(updateDoc(doc(db, 'shopping', item.id), left.length ? { parts: left } : { status: 'porComprar', parts: deleteField() }))
+  fire(updateDoc(doc(db, 'shopping', item.id), left.length ? { parts: arrayRemove(gone) } : { status: 'porComprar', parts: deleteField() }))
 }
 
 /** "Tirar tudo do carrinho". */

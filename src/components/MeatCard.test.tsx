@@ -31,6 +31,13 @@ test('asks what goes in, with the most bought type picked and kg for meat', () =
   expect(screen.getByRole('button', { name: 'kg' }).className).toContain('on')
 })
 
+test('a new type ("+ outro") starts in units, not kg', () => {
+  renderIt()
+  fireEvent.click(screen.getByRole('button', { name: '+ outro' }))
+  expect(screen.getByRole('button', { name: 'un.' }).className).toContain('on')
+  expect(screen.getByRole('button', { name: 'kg' }).className).not.toContain('on')
+})
+
 test('a bad or empty amount keeps "Pôr no carrinho" disabled', () => {
   renderIt()
   for (const v of ['abc', '', '0']) {

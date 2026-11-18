@@ -27,6 +27,8 @@ vi.mock('firebase/firestore', async () => ({
   writeBatch: () => ({ set: fs.set, update: fs.update, delete: fs.del, commit: fs.commit }),
   deleteField: () => 'DEL',
   serverTimestamp: () => 'now',
+  arrayUnion: (...v: unknown[]) => ({ union: v }),
+  arrayRemove: (...v: unknown[]) => ({ remove: v }),
 }))
 
 beforeEach(() => vi.clearAllMocks())
@@ -205,26 +207,26 @@ test('unticking removes the store from the item', () => {
   expect(fs.updateDoc).toHaveBeenLastCalledWith(expect.anything(), { status: 'porComprar', store: 'DEL' })
 })
 
-test('addPart appends a part with its own id and puts the item in the cart', () => {
+test('addPart adds only the new part (arrayUnion), so a part added on the other phone is never overwritten', () => {
   const old = part({ id: 'a', name: 'Vaca' })
   addPart(item({ id: 'i1', parts: [old] }), { productId: 'v', name: 'Vazia', amount: 1, unit: 'kg', store: 'Lidl' })
-  const [ref, data] = fs.updateDoc.mock.calls[0] as unknown as [{ path: string }, { parts: { id: string }[]; status: string }]
+  const [ref, data] = fs.updateDoc.mock.calls[0] as unknown as [{ path: string }, { parts: { union: { id: string }[] }; status: string }]
   expect(ref.path).toBe('shopping/i1')
   expect(data.status).toBe('carrinho')
-  expect(data.parts).toEqual([old, { id: expect.any(String), productId: 'v', name: 'Vazia', amount: 1, unit: 'kg', store: 'Lidl' }])
-  expect(data.parts[1].id).not.toBe('a')
+  expect(data.parts.union).toEqual([{ id: expect.any(String), productId: 'v', name: 'Vazia', amount: 1, unit: 'kg', store: 'Lidl' }])
+  expect(data.parts.union[0].id).not.toBe('a')
 })
 
 test('addPart without a store writes no store field (Firestore has no undefined)', () => {
   addPart(item({ id: 'i1' }), { productId: 'v', name: 'Vaca', amount: 1, unit: 'kg', store: undefined })
-  const data = (fs.updateDoc.mock.calls[0] as unknown as [unknown, { parts: object[] }])[1]
-  expect(data.parts[0]).not.toHaveProperty('store')
+  const data = (fs.updateDoc.mock.calls[0] as unknown as [unknown, { parts: { union: object[] } }])[1]
+  expect(data.parts.union[0]).not.toHaveProperty('store')
 })
 
-test('removePart keeps the other parts in the cart', () => {
+test('removePart removes only that part (arrayRemove), keeping the others in the cart', () => {
   const a = part({ id: 'a' }), b = part({ id: 'b' })
   removePart(item({ id: 'i1', status: 'carrinho', parts: [a, b] }), 'a')
-  expect(fs.updateDoc).toHaveBeenLastCalledWith(expect.anything(), { parts: [b] })
+  expect(fs.updateDoc).toHaveBeenLastCalledWith(expect.anything(), { parts: { remove: [a] } })
 })
 
 test('removePart of the only part takes the item out of the cart', () => {

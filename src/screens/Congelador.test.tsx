@@ -62,7 +62,7 @@ test('Dividir 5 kg defaults to 5 bags of 1 kg, with undo', () => {
   data.bags = [b]
   renderIt()
   openSplit('Vaca')
-  expect((screen.getByLabelText('Quantidade por saco') as HTMLInputElement).value).toBe('1')
+  expect(screen.getByText('sacos de 1 kg')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'Dividir em 5' }))
   expect(freezer.splitBag).toHaveBeenCalledWith(b, [1, 1, 1, 1, 1])
   fireEvent.click(screen.getByRole('button', { name: 'Desfazer' }))
@@ -76,24 +76,22 @@ test('Dividir 1 kg in 3 keeps the total', () => {
   renderIt()
   openSplit('Vaca')
   fireEvent.click(screen.getByRole('button', { name: 'Mais sacos' }))
-  expect((screen.getByLabelText('Quantidade por saco') as HTMLInputElement).value).toBe('0,33')
+  expect(screen.getByText('sacos de ~0,33 kg')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'Dividir em 3' }))
   expect(freezer.splitBag).toHaveBeenCalledWith(b, [0.33, 0.33, 0.34])
 })
 
-test('an edited amount per bag gives equal bags; an invalid one is refused', () => {
-  const b = bag({ name: 'Vaca', amount: 1, unit: 'kg' })
+test('Dividir never changes the total: 4 kg in 4 bags is 1 kg each, and there is no amount to type', () => {
+  const b = bag({ name: 'Porco', amount: 4, unit: 'kg' })
   data.bags = [b]
   renderIt()
-  openSplit('Vaca')
-  fireEvent.change(screen.getByLabelText('Quantidade por saco'), { target: { value: 'x' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Dividir em 2' }))
-  expect(screen.getByText('Quantidade inválida')).toBeTruthy()
-  expect(freezer.splitBag).not.toHaveBeenCalled()
-  fireEvent.change(screen.getByLabelText('Quantidade por saco'), { target: { value: '0,5' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Mais sacos' }))
+  openSplit('Porco')
+  expect(screen.queryByLabelText('Quantidade por saco')).toBeNull()
+  expect(screen.getByText('sacos de 1 kg')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Menos sacos' }))
+  expect(screen.getByText('sacos de ~1,33 kg')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'Dividir em 3' }))
-  expect(freezer.splitBag).toHaveBeenCalledWith(b, [0.5, 0.5, 0.5])
+  expect(freezer.splitBag).toHaveBeenCalledWith(b, [1.33, 1.33, 1.34])
 })
 
 const lastBagOfVaca = () => {
@@ -159,15 +157,6 @@ test('each bag has its own button names (screen readers)', () => {
   }
 })
 
-test('a typed amount per bag shows the new total when it differs', () => {
-  data.bags = [bag({ name: 'Vaca', amount: 1, unit: 'kg' })]
-  renderIt()
-  openSplit('Vaca')
-  expect(screen.queryByText(/Total/)).toBeNull()
-  fireEvent.change(screen.getByLabelText('Quantidade por saco'), { target: { value: '0,4' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Mais sacos' }))
-  expect(screen.getByText('Total: 1,2 kg (era 1 kg)')).toBeTruthy()
-})
 
 test('tiny amounts cannot be split into more bags than hundredths', () => {
   const b = bag({ name: 'Sal', amount: 0.03, unit: 'kg' })

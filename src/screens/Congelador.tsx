@@ -160,23 +160,23 @@ export default function Congelador() {
   )
 }
 
-/** "Dividir": when the pack is split at home. Equal parts by default (total kept exact); the amount can be typed. */
+/**
+ * "Dividir": when the pack is split at home. Only the number of bags is chosen: the total never changes
+ * (a typed amount per bag once turned 4 kg into 8 kg). A bag that really weighs differently is fixed with "Corrigir".
+ */
 function SplitBag({ bag, onSplit, onCancel }: { bag: FreezerBag; onSplit: (amounts: number[]) => void; onCancel: () => void }) {
   const most = maxSplit(bag.amount)
   const whole = Number.isInteger(bag.amount) && bag.amount > 1
   const [count, setCount] = useState(Math.min(most, whole ? bag.amount : 2))
-  // null = untouched: follows the count, and the last bags take the rounding
-  const [typed, setTyped] = useState<string | null>(null)
   const [error, setError] = useState('')
+  // equal parts in hundredths; the last bags take the rounding, so the total stays exact
   const parts = splitAmounts(bag.amount, count)
-  const typedAmount = typed === null ? null : parseAmount(typed)
-  const newTotal = typedAmount === null ? null : Math.round(typedAmount * count * 100) / 100
+  const uneven = parts.some(p => p !== parts[0])
 
   function save(e: FormEvent) {
     e.preventDefault()
-    if (typed !== null && typedAmount === null) return setError('Quantidade inválida')
     try {
-      onSplit(typedAmount === null ? parts : Array.from({ length: count }, () => typedAmount))
+      onSplit(parts)
     } catch (err) {
       setError(`Não foi possível dividir: ${(err as Error).message}`)
     }
@@ -190,16 +190,8 @@ function SplitBag({ bag, onSplit, onCancel }: { bag: FreezerBag; onSplit: (amoun
           <b aria-live="polite">{count}</b>
           <button type="button" aria-label="Mais sacos" onClick={() => setCount(Math.min(most, count + 1))}><Icon name="mais1" /></button>
         </span>
-        <span>sacos de</span>
-        <span className="bag-amount">
-          <input className="input" inputMode="decimal" aria-label="Quantidade por saco" value={typed ?? ptNum(parts[0])}
-            onChange={e => { setTyped(e.target.value); setError('') }} />
-          <span>{UNIT_LABEL[bag.unit]}</span>
-        </span>
+        <span>sacos de {uneven ? '~' : ''}{ptNum(parts[0])} {UNIT_LABEL[bag.unit]}</span>
       </div>
-      {newTotal !== null && newTotal !== bag.amount && (
-        <p className="note">Total: {ptNum(newTotal)} {UNIT_LABEL[bag.unit]} (era {ptNum(bag.amount)} {UNIT_LABEL[bag.unit]})</p>
-      )}
       {error && <p className="error">{error}</p>}
       <div className="form-actions">
         <button type="button" className="link-btn" onClick={onCancel}>Cancelar</button>

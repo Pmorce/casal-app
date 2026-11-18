@@ -1,4 +1,5 @@
 import { formatAmount, unitLabel } from './freezer'
+import { normalize } from './shopping'
 import { freezerCategoryOf } from './zones'
 import type { Part, Product, ShoppingItem } from './types'
 
@@ -10,12 +11,16 @@ export function meatProductOf(item: ShoppingItem, products: Product[]): Product 
   return p && isMeat(p) ? p : null
 }
 
-/** Types offered in the card: the item's own product first (unless generic), then the other meat, most bought first. */
+// family words: what someone writes on the list for "some meat", never a type you buy
+const FAMILY = new Set(['carne', 'carnes', 'peixe', 'peixes', 'talho'])
+const isType = (p: Product) => isMeat(p) && !p.generic && !FAMILY.has(normalize(p.name))
+
+/** Types offered in the card: the item's own product first (unless generic or a family word), then the other meat, most bought first. */
 export function meatTypes(own: Product, products: Product[]): Product[] {
   const others = products
-    .filter(p => p.id !== own.id && isMeat(p) && !p.generic)
+    .filter(p => p.id !== own.id && isType(p))
     .sort((a, b) => (b.boughtKeys?.length ?? 0) - (a.boughtKeys?.length ?? 0) || a.name.localeCompare(b.name, 'pt-PT'))
-  return own.generic ? others : [own, ...others]
+  return isType(own) ? [own, ...others] : others
 }
 
 /** One part as it reads: "2,5 kg Vaca". */
