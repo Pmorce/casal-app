@@ -1,11 +1,14 @@
-import { addItem, boughtOutside, finish, markMissing, renameProduct, setFreezerCategory, toggleCart, undoFinish } from './shoppingRepo'
-import { bag, item, prod } from '../domain/testFactories'
+import {
+  addItem, addPart, boughtOutside, clearParts, ensureMeatProduct, finish, markMissing, removePart, renameProduct, setFreezerCategory, toggleCart, undoFinish,
+} from './shoppingRepo'
+import { bag, item, part, prod } from '../domain/testFactories'
 import { fire } from './write'
 
 const fs = vi.hoisted(() => ({
   addDoc: vi.fn(async (_ref: unknown, _data: Record<string, unknown>) => ({ id: 'new' })),
   set: vi.fn(), update: vi.fn(), del: vi.fn(), commit: vi.fn(async () => {}),
   updateDoc: vi.fn(async () => {}),
+  setDoc: vi.fn(async () => {}),
 }))
 vi.mock('./firebase', () => ({ db: {} }))
 vi.mock('./write', () => ({ fire: vi.fn() }))
@@ -14,6 +17,7 @@ vi.mock('firebase/firestore', async () => ({
   doc: vi.fn((...args: unknown[]) => ({ id: String(args[2] ?? 'newId'), path: args.slice(1).join('/') })),
   addDoc: fs.addDoc,
   updateDoc: fs.updateDoc,
+  setDoc: fs.setDoc,
   writeBatch: () => ({ set: fs.set, update: fs.update, delete: fs.del, commit: fs.commit }),
   deleteField: () => 'DEL',
   serverTimestamp: () => 'now',
@@ -142,4 +146,46 @@ test('ticking with a store writes it on the item; without a store there is no fi
 test('unticking removes the store from the item', () => {
   toggleCart(item({ id: 'a', status: 'carrinho', store: 'Lidl' }), 'Lidl')
   expect(fs.updateDoc).toHaveBeenLastCalledWith(expect.anything(), { status: 'porComprar', store: 'DEL' })
+})
+
+test('addPart appends a part with its own id and puts the item in the cart', () => {
+  const old = part({ id: 'a', name: 'Vaca' })
+  addPart(item({ id: 'i1', parts: [old] }), { productId: 'v', name: 'Vazia', amount: 1, unit: 'kg', store: 'Lidl' })
+  const [ref, data] = fs.updateDoc.mock.calls[0] as unknown as [{ path: string }, { parts: { id: string }[]; status: string }]
+  expect(ref.path).toBe('shopping/i1')
+  expect(data.status).toBe('carrinho')
+  expect(data.parts).toEqual([old, { id: expect.any(String), productId: 'v', name: 'Vazia', amount: 1, unit: 'kg', store: 'Lidl' }])
+  expect(data.parts[1].id).not.toBe('a')
+})
+
+test('addPart without a store writes no store field (Firestore has no undefined)', () => {
+  addPart(item({ id: 'i1' }), { productId: 'v', name: 'Vaca', amount: 1, unit: 'kg', store: undefined })
+  const data = (fs.updateDoc.mock.calls[0] as unknown as [unknown, { parts: object[] }])[1]
+  expect(data.parts[0]).not.toHaveProperty('store')
+})
+
+test('removePart keeps the other parts in the cart', () => {
+  const a = part({ id: 'a' }), b = part({ id: 'b' })
+  removePart(item({ id: 'i1', status: 'carrinho', parts: [a, b] }), 'a')
+  expect(fs.updateDoc).toHaveBeenLastCalledWith(expect.anything(), { parts: [b] })
+})
+
+test('removePart of the only part takes the item out of the cart', () => {
+  removePart(item({ id: 'i1', status: 'carrinho', parts: [part({ id: 'a' })] }), 'a')
+  expect(fs.updateDoc).toHaveBeenLastCalledWith(expect.anything(), { status: 'porComprar', parts: 'DEL' })
+})
+
+test('clearParts empties the parts and unticks', () => {
+  clearParts(item({ id: 'i1', status: 'carrinho', parts: [part(), part()] }))
+  expect(fs.updateDoc).toHaveBeenLastCalledWith(expect.anything(), { status: 'porComprar', parts: 'DEL' })
+})
+
+test('ensureMeatProduct uses an existing product by name (any case/accents)', () => {
+  expect(ensureMeatProduct(' almondegas ', [prod({ id: 'a', name: 'Almôndegas' })])).toEqual({ id: 'a', name: 'Almôndegas' })
+  expect(fs.setDoc).not.toHaveBeenCalled()
+})
+
+test('ensureMeatProduct creates a Congelador meat product and returns its id at once', () => {
+  expect(ensureMeatProduct('  Vazia ', [])).toEqual({ id: 'newId', name: 'Vazia' })
+  expect(fs.setDoc).toHaveBeenCalledWith(expect.anything(), { name: 'Vazia', location: 'congelador', freezerCategory: 'carne' })
 })

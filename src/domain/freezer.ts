@@ -17,8 +17,20 @@ export const CATEGORIES: { value: FreezerCategory; label: string }[] = [
   { value: 'outros', label: 'Outros' },
 ]
 
+/** The units offered for an amount, with how they read. */
+export const UNITS: { value: FreezerUnit; label: string }[] = [
+  { value: 'un', label: 'un.' },
+  { value: 'g', label: 'g' },
+  { value: 'kg', label: 'kg' },
+  { value: 'doses', label: 'doses' },
+]
+
+export const unitLabel = (u: FreezerUnit): string => UNITS.find(x => x.value === u)!.label
+
 const OLD_AFTER_DAYS = 90
 const num = new Intl.NumberFormat('pt-PT', { maximumFractionDigits: 2 })
+/** pt-PT amount ("2,5"), at most two decimals. */
+export const formatAmount = (n: number): string => num.format(n).replace(/\s/g, '')
 
 export function parseAmount(s: string): number | null {
   const t = s.trim().replace(',', '.')
@@ -101,7 +113,7 @@ export const maxSplit = (total: number): number => Math.min(20, Math.round(total
 
 /** What the "Para o congelador" row starts with: the last entry, else kg for meat and units for the rest. */
 export function freezeDefaults(p: Product): { amount: string; unit: FreezerUnit } {
-  if (p.freezerLast) return { amount: num.format(p.freezerLast.amount).replace(/\s/g, ''), unit: p.freezerLast.unit }
+  if (p.freezerLast) return { amount: formatAmount(p.freezerLast.amount), unit: p.freezerLast.unit }
   return { amount: '', unit: freezerCategoryOf(p) === 'carne' ? 'kg' : 'un' }
 }
 

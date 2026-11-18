@@ -5,7 +5,7 @@ import { cleanText, findProduct, finishShopping, isOnList, normalize } from '../
 import { itemsOfProduct } from '../domain/pantry'
 import { recordPurchase, snoozeUntil } from '../domain/rhythm'
 import type { DateKey } from '../domain/dates'
-import type { FreezerBag, Product, ShoppingItem, Zone } from '../domain/types'
+import type { FreezerBag, Part, Product, ShoppingItem, Zone } from '../domain/types'
 
 /**
  * A known product name goes straight on the list. A new name returns 'needsZone' without writing:
@@ -73,6 +73,39 @@ export function toggleCart(item: ShoppingItem, store?: string): void {
     ? { status: 'porComprar', store: deleteField() }
     : { status: 'carrinho', ...(store ? { store } : {}) }
   fire(updateDoc(doc(db, 'shopping', item.id), data))
+}
+
+/**
+ * Meat card: each "Pôr no carrinho" adds a part (with its own id) and ticks the item. The whole array is rewritten:
+ * both phones rarely add parts to the same item at once. No store field without a trip (Firestore has no undefined).
+ */
+export function addPart(item: ShoppingItem, part: Omit<Part, 'id'>): void {
+  const { store, ...rest } = part
+  const added: Part = { id: doc(collection(db, 'shopping')).id, ...rest, ...(store ? { store } : {}) }
+  fire(updateDoc(doc(db, 'shopping', item.id), { parts: [...(item.parts ?? []), added], status: 'carrinho' }))
+}
+
+/** ✕ on a part; without parts left the item is no longer in the cart. */
+export function removePart(item: ShoppingItem, partId: string): void {
+  const left = (item.parts ?? []).filter(p => p.id !== partId)
+  fire(updateDoc(doc(db, 'shopping', item.id), left.length ? { parts: left } : { status: 'porComprar', parts: deleteField() }))
+}
+
+/** "Tirar tudo do carrinho". */
+export const clearParts = (item: ShoppingItem): void =>
+  fire(updateDoc(doc(db, 'shopping', item.id), { status: 'porComprar', parts: deleteField() }))
+
+/**
+ * "+ outro" in the meat card: the product of that name, else a new Congelador meat product, created now
+ * (so undoing "Terminar" never has to delete products). Its id is known at once, before the server answers.
+ */
+export function ensureMeatProduct(name: string, products: Product[]): { id: string; name: string } {
+  const clean = cleanText(name) ?? name
+  const known = findProduct(clean, products)
+  if (known) return { id: known.id, name: known.name }
+  const ref = doc(collection(db, 'products'))
+  fire(setDoc(ref, { name: clean, location: 'congelador', freezerCategory: 'carne' }))
+  return { id: ref.id, name: clean }
 }
 
 /**

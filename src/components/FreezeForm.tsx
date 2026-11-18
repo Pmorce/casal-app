@@ -1,16 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { freezeBought, type FrozenBatch } from '../data/freezerRepo'
-import { freezeDefaults, parseAmount } from '../domain/freezer'
+import { freezeDefaults, parseAmount, UNITS } from '../domain/freezer'
 import type { DateKey } from '../domain/dates'
 import type { FreezerUnit, Product } from '../domain/types'
 import { Badge } from './Icon'
-
-const UNITS: { value: FreezerUnit; label: string }[] = [
-  { value: 'un', label: 'un.' },
-  { value: 'g', label: 'g' },
-  { value: 'kg', label: 'kg' },
-  { value: 'doses', label: 'doses' },
-]
 
 interface Edit { amount?: string; unit?: FreezerUnit; invalid?: boolean }
 

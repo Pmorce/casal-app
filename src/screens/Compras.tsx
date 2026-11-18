@@ -9,6 +9,7 @@ import { addCustomStore, changeStore, leaveTrip, restoreTrip, startTrip } from '
 import { backToCasa, maybeMissing } from '../domain/shopping'
 import { shownGap } from '../domain/rhythm'
 import { freezerInCart, unlinkOrphans } from '../domain/freezer'
+import { meatProductOf, partsLine } from '../domain/meat'
 import { activeTrip, customStores, staleTrip, storeOptions } from '../domain/stores'
 import { GROUP_LABEL, groupByZone, guessZone, ZONES } from '../domain/zones'
 import type { FreezerBag, Product, Purchase, ShoppingItem, Zone } from '../domain/types'
@@ -20,6 +21,7 @@ import Avatar from '../components/Avatar'
 import Icon, { GROUP_ICON } from '../components/Icon'
 import StorePicker from '../components/StorePicker'
 import TripBar from '../components/TripBar'
+import MeatCard from '../components/MeatCard'
 
 type ZonePick = Zone | 'oneOff'
 const PICKS: { value: ZonePick; short: string }[] = [...ZONES, { value: 'oneOff', short: 'Só desta vez' }]
@@ -61,6 +63,8 @@ export default function Compras() {
   const stale = staleTrip(meta, today) !== null
   // a trip left from an earlier day is cleared quietly; braces matter (see SpentForm)
   useEffect(() => { if (stale) leaveTrip() }, [stale])
+  // the meat card open under its row (one at a time)
+  const [meatOpen, setMeatOpen] = useState<string | null>(null)
 
   // ticked items stay where they are (same alphabetical order) until "Terminar compras"
   const groups = groupByZone(items, products)
@@ -110,19 +114,30 @@ export default function Compras() {
     })
   }
 
-  const row = (i: ShoppingItem, picker = false) => (
-    <div key={i.id}>
-      <div className={i.status === 'carrinho' ? 'row done' : 'row'}>
-        <button className={i.status === 'carrinho' ? 'check on' : 'check'} aria-label={i.text} onClick={() => toggleCart(i, trip?.store)}>
-          {i.status === 'carrinho' && <Icon name="check" />}
-        </button>
-        <div className={i.status === 'carrinho' ? 'grow done-text soft' : 'grow'}>{i.text}</div>
-        {i.status === 'porComprar' && <Avatar uid={i.addedBy} size="sm" />}
-        {i.status === 'porComprar' && <button className="x-btn" aria-label={`Apagar ${i.text}`} onClick={() => remove(i)}><Icon name="x" /></button>}
+  const row = (i: ShoppingItem, picker = false) => {
+    // meat/fish: the check asks "o que levas?" (and reopens it to add or take out a part) instead of ticking
+    const meat = meatProductOf(i, products)
+    const tap = () => (meat ? setMeatOpen(open => (open === i.id ? null : i.id)) : toggleCart(i, trip?.store))
+    return (
+      <div key={i.id}>
+        <div className={i.status === 'carrinho' ? 'row done' : 'row'}>
+          <button className={i.status === 'carrinho' ? 'check on' : 'check'} aria-label={i.text} onClick={tap}>
+            {i.status === 'carrinho' && <Icon name="check" />}
+          </button>
+          <div className={i.status === 'carrinho' ? 'grow done-text soft' : 'grow'}>
+            {i.text}
+            {i.status === 'carrinho' && !!i.parts?.length && <div className="note">Já levas: {partsLine(i.parts)}</div>}
+          </div>
+          {i.status === 'porComprar' && <Avatar uid={i.addedBy} size="sm" />}
+          {i.status === 'porComprar' && <button className="x-btn" aria-label={`Apagar ${i.text}`} onClick={() => remove(i)}><Icon name="x" /></button>}
+        </div>
+        {picker && <ZonePicker label={i.text} onPick={z => classifyItem(i, z, products)} />}
+        {meat && meatOpen === i.id && (
+          <MeatCard item={i} own={meat} products={products} store={trip?.store} onClose={() => setMeatOpen(null)} />
+        )}
       </div>
-      {picker && <ZonePicker label={i.text} onPick={z => classifyItem(i, z, products)} />}
-    </div>
-  )
+    )
+  }
 
   return (
     <>

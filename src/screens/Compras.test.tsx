@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import Compras from './Compras'
-import { item, prod } from '../domain/testFactories'
+import { item, part, prod } from '../domain/testFactories'
 import type { FreezerBag, Product, ShoppingItem, Trip } from '../domain/types'
 
 const data = vi.hoisted(() => ({ shopping: [] as ShoppingItem[], products: [] as Product[], bags: [] as FreezerBag[], meta: [] as { id: string }[] }))
@@ -14,6 +14,7 @@ vi.mock('../hooks/useToday', () => ({ useToday: () => '2026-10-29' }))
 const repo = vi.hoisted(() => ({
   addItem: vi.fn(), toggleCart: vi.fn(), deleteItem: vi.fn(), undoFinish: vi.fn(),
   classifyItem: vi.fn(), markMissing: vi.fn(), snooze: vi.fn(),
+  addPart: vi.fn(), removePart: vi.fn(), clearParts: vi.fn(), ensureMeatProduct: vi.fn(),
   finish: vi.fn(() => ({ items: [], products: [] })),
 }))
 vi.mock('../data/shoppingRepo', () => repo)
@@ -281,4 +282,31 @@ test('a ticked item keeps its place in the zone and there is no "No carrinho" ca
   expect(screen.queryByRole('heading', { name: 'No carrinho' })).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: 'Arroz' }))
   expect(repo.toggleCart).toHaveBeenCalledWith(expect.objectContaining({ text: 'Arroz' }), undefined)
+})
+
+test('tapping a meat item asks what goes in instead of ticking it, one card at a time', () => {
+  data.products = [
+    prod({ id: 'c', name: 'Carne', location: 'congelador', freezerCategory: 'carne' }),
+    prod({ id: 'x', name: 'Peixe', location: 'congelador', freezerCategory: 'carne' }),
+    prod({ id: 'e', name: 'Ervilhas', location: 'congelador', freezerCategory: 'outros' }),
+  ]
+  data.shopping = [item({ text: 'Carne', productId: 'c' }), item({ text: 'Peixe', productId: 'x' }), item({ text: 'Ervilhas', productId: 'e' })]
+  renderIt()
+  fireEvent.click(screen.getByRole('button', { name: 'Carne' }))
+  expect(screen.getByRole('heading', { name: 'Carne — o que levas?' })).toBeTruthy()
+  expect(repo.toggleCart).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Peixe' }))
+  expect(screen.queryByRole('heading', { name: 'Carne — o que levas?' })).toBeNull()
+  expect(screen.getByRole('heading', { name: 'Peixe — o que levas?' })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Ervilhas' }))
+  expect(repo.toggleCart).toHaveBeenCalledWith(expect.objectContaining({ text: 'Ervilhas' }), undefined)
+})
+
+test('a ticked meat item says what is already in the cart', () => {
+  data.products = [prod({ id: 'c', name: 'Carne', location: 'congelador', freezerCategory: 'carne' })]
+  data.shopping = [item({ text: 'Carne', productId: 'c', status: 'carrinho', parts: [
+    part({ name: 'Vaca', amount: 3, unit: 'kg' }), part({ name: 'Vazia', amount: 1, unit: 'kg' }),
+  ] })]
+  renderIt()
+  expect(screen.getByText('Já levas: 3 kg Vaca · 1 kg Vazia')).toBeTruthy()
 })
