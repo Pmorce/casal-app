@@ -116,3 +116,8 @@ export function freezeDefaults(p: Product): { amount: string; unit: FreezerUnit 
   if (p.freezerLast) return { amount: formatAmount(p.freezerLast.amount), unit: p.freezerLast.unit }
   return { amount: '', unit: freezerCategoryOf(p) === 'carne' ? 'kg' : 'un' }
 }
+
+/** What a purchase had: the unit only counts together with an amount; Firestore gets no undefined, so absent fields are left out. */
+export function amountWas(amount?: number, unit?: FreezerUnit): { amount?: number; unit?: FreezerUnit } {
+  return amount ? { amount, ...(unit ? { unit } : {}) } : {}
+}

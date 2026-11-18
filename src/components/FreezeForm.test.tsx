@@ -81,9 +81,10 @@ test('two parts of the same product are two rows, pre-filled with their amounts,
     { key: 'a', product: vaca, amount: 3, unit: 'kg', purchaseId: 'pu1' },
     { key: 'b', product: vaca, amount: 1, unit: 'kg', purchaseId: 'pu2' },
   ]} />)
-  const fields = screen.getAllByLabelText('Quantidade de Vaca') as HTMLInputElement[]
-  expect(fields.map(f => f.value)).toEqual(['3', '1'])
-  fireEvent.change(fields[1], { target: { value: '1,5' } })
+  expect((screen.getByLabelText('Quantidade de Vaca (1 de 2)') as HTMLInputElement).value).toBe('3')
+  expect((screen.getByLabelText('Quantidade de Vaca (2 de 2)') as HTMLInputElement).value).toBe('1')
+  expect(screen.getByRole('button', { name: 'Vaca (2 de 2): kg' })).toBeTruthy()
+  fireEvent.change(screen.getByLabelText('Quantidade de Vaca (2 de 2)'), { target: { value: '1,5' } })
   fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
   expect(repo.freezeBought).toHaveBeenCalledWith([
     { product: vaca, amount: 3, unit: 'kg', purchaseId: 'pu1', was: { amount: 3, unit: 'kg' } },

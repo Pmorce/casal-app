@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { freezeBought, type FrozenBatch } from '../data/freezerRepo'
-import { formatAmount, freezeDefaults, parseAmount, UNITS } from '../domain/freezer'
+import { amountWas, formatAmount, freezeDefaults, parseAmount, UNITS } from '../domain/freezer'
 import type { DateKey } from '../domain/dates'
 import type { FreezerUnit, Product } from '../domain/types'
 import { Badge } from './Icon'
@@ -33,6 +33,11 @@ export default function FreezeForm({ rows: inputs, today, onSaved, onDone }: Pro
       const initial = r.amount ? { amount: formatAmount(r.amount), unit: r.unit ?? start.unit } : start
       return { input: r, product: r.product, ...initial, invalid: false, ...edits[r.key] }
     })
+  // two parts of the same product share a name: number them so each row has its own accessible name
+  const nameOf = (r: { product: Product; input: FreezeInput }) => {
+    const same = inputs.filter(i => i.product.name === r.product.name)
+    return same.length > 1 ? `${r.product.name} (${same.indexOf(r.input) + 1} de ${same.length})` : r.product.name
+  }
   const form = useRef<HTMLFormElement>(null)
   // braces matter: recent Chromium returns a Promise here, and React would call it as the cleanup (black screen)
   useEffect(() => { form.current?.scrollIntoView?.({ block: 'center', behavior: 'smooth' }) }, [])
@@ -48,7 +53,7 @@ export default function FreezeForm({ rows: inputs, today, onSaved, onDone }: Pro
       return [{
         key: input.key, product: r.product, amount, unit: r.unit,
         ...(input.purchaseId ? { purchaseId: input.purchaseId } : {}),
-        was: { ...(input.amount ? { amount: input.amount } : {}), ...(input.amount && input.unit ? { unit: input.unit } : {}) },
+        was: amountWas(input.amount, input.unit),
       }]
     })
     const left = rows.filter(r => parseAmount(r.amount) === null)
@@ -73,13 +78,13 @@ export default function FreezeForm({ rows: inputs, today, onSaved, onDone }: Pro
         <div className="freeze-row" key={r.input.key}>
           <div className="freeze-head">
             <strong className="grow product-name">{r.product.name}</strong>
-            <input className="input" inputMode="decimal" placeholder="ex.: 2,5" aria-label={`Quantidade de ${r.product.name}`}
+            <input className="input" inputMode="decimal" placeholder="ex.: 2,5" aria-label={`Quantidade de ${nameOf(r)}`}
               value={r.amount} onChange={e => change(r.input.key, { amount: e.target.value })} />
           </div>
           <div className="seg compact" style={{ marginTop: 6 }}>
             {UNITS.map(u => (
               <button type="button" key={u.value} className={r.unit === u.value ? 'on' : ''}
-                aria-label={`${r.product.name}: ${u.label}`} onClick={() => change(r.input.key, { unit: u.value })}>{u.label}</button>
+                aria-label={`${nameOf(r)}: ${u.label}`} onClick={() => change(r.input.key, { unit: u.value })}>{u.label}</button>
             ))}
           </div>
           {r.invalid && <p className="small error">Quantidade inválida</p>}

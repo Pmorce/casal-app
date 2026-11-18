@@ -382,3 +382,23 @@ test('"Onde foi?" from "Terminar" goes away when the cart empties (finished on t
   expect(screen.queryByText('Onde foi?')).toBeNull()
   expect(screen.getByRole('button', { name: /Terminar compras/ })).toBeTruthy()
 })
+
+test('the freezer rows come from the plan: pre-filled from each part, tied to its purchase, a gone product skipped', () => {
+  data.products = [prod({ id: 'v', name: 'Vaca', location: 'congelador', freezerCategory: 'carne' })]
+  data.shopping = [item({ id: 'i', productId: 'v', status: 'carrinho', parts: [
+    part({ id: 'a', productId: 'v', name: 'Vaca', amount: 3, unit: 'kg' }),
+    part({ id: 'b', productId: 'v', name: 'Vaca', amount: 1.5, unit: 'kg' }),
+    part({ id: 'c', productId: 'gone', name: 'Peixe', amount: 2, unit: 'kg' }),
+  ] })]
+  repo.finish.mockReturnValueOnce({ items: [], products: [], purchaseIds: { a: 'pu1', b: 'pu2', c: 'pu3' } })
+  renderIt()
+  terminar()
+  expect((screen.getByLabelText('Quantidade de Vaca (1 de 2)') as HTMLInputElement).value).toBe('3')
+  expect((screen.getByLabelText('Quantidade de Vaca (2 de 2)') as HTMLInputElement).value).toBe('1,5')
+  expect(screen.queryByLabelText(/Peixe/)).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+  expect(freezer.freezeBought).toHaveBeenCalledWith([
+    expect.objectContaining({ amount: 3, unit: 'kg', purchaseId: 'pu1' }),
+    expect.objectContaining({ amount: 1.5, unit: 'kg', purchaseId: 'pu2' }),
+  ], '2026-10-29')
+})

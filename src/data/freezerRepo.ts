@@ -105,7 +105,7 @@ export function freezeBought(rows: FreezeRow[], today: DateKey): FrozenBatch {
   return {
     bagIds: ids,
     previous: rows.map(({ product }) => ({ id: product.id, freezerLast: product.freezerLast })),
-    purchases: withPurchase.map(r => ({ id: r.purchaseId, ...(r.was?.amount ? { amount: r.was.amount } : {}), ...(r.was?.amount && r.was.unit ? { unit: r.was.unit } : {}) })),
+    purchases: withPurchase.map(r => ({ id: r.purchaseId, ...r.was })),
   }
 }
 
