@@ -330,3 +330,23 @@ test('"+ Produto" left empty stays to count; a bad number is not added', () => {
   fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }))
   expect(repo.addProduct).toHaveBeenCalledWith('Arroz', 'despensa', [], undefined)
 })
+
+test('"Pôr na lista" checks the list as it is when tapped, not as it was at "−"', () => {
+  data.products = [fridge({ id: 'i', name: 'Iogurtes', count: 1 })]
+  const { rerender } = renderIt('Frigorífico')
+  fireEvent.click(screen.getByRole('button', { name: 'Menos Iogurtes' }))
+  data.shopping = [item({ id: 'x', productId: 'i' })]
+  rerender(<MemoryRouter><Casa /></MemoryRouter>)
+  fireEvent.click(screen.getByRole('button', { name: 'Pôr na lista' }))
+  expect(repo.markMissing).toHaveBeenCalledWith(expect.objectContaining({ id: 'i' }), 'P', [expect.objectContaining({ id: 'x' })])
+})
+
+test('at 0 with a pending quantity "+" stays, and Comprei moves to the row menu', () => {
+  data.products = [fridge({ id: 'k', name: 'Kefir', count: 0, qtyPending: true })]
+  renderIt('Frigorífico')
+  fireEvent.click(screen.getByRole('button', { name: 'Mais Kefir' }))
+  expect(stock.changeCount).toHaveBeenCalledWith(expect.objectContaining({ id: 'k' }), 1)
+  expect(screen.queryByRole('button', { name: 'Comprei Kefir' })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Mais ações de Kefir' }))
+  expect(screen.getByRole('button', { name: 'Comprei Kefir' })).toBeTruthy()
+})

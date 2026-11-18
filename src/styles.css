@@ -312,8 +312,10 @@ h2 { font-size: 16px; font-weight: 800; margin: 18px 0 8px; }
 .freeze-head { display: flex; align-items: center; gap: 8px; }
 .freeze-head .input { flex: none; width: 96px; }
 /* Casa by place: − número + per counted product; the number is a button ("Quantos há?"), dimmed when it may be stale */
-.stepper.count { gap: 2px; }
-.stepper button.num { width: auto; min-width: 32px; padding: 0 4px; border-radius: 12px; background: none; box-shadow: none; color: var(--text); font-size: 15px; font-weight: 800; }
+/* the gap matches the 6px side overlays of − and +, and the number's overlay only grows up and down: the three never overlap */
+.stepper.count { gap: 6px; }
+.stepper button.num { width: auto; min-width: 44px; padding: 0 4px; border-radius: 12px; background: none; box-shadow: none; color: var(--text); font-size: 15px; font-weight: 800; }
+.stepper button.num::after { inset: -6px 0; }
 .stepper button.num.dim { color: var(--muted); font-weight: 600; }
 .stepper-gap { width: 32px; height: 32px; flex: none; }
 .stepper .chip { width: auto; height: auto; padding: 0 12px; border-radius: 99px; background: var(--accent-soft); color: var(--accent-ink); box-shadow: none; }

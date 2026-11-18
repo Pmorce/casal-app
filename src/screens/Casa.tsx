@@ -1,4 +1,4 @@
-import { useCallback, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useCollection } from '../data/useCollection'
 import { useSession } from '../data/session'
@@ -67,6 +67,43 @@ function countedNote(p: Product, items: ShoppingItem[], today: DateKey): string 
 }
 
 type Ask = { id: string; kind: 'ha' | 'comprei' }
+type MenuEntry = 'falta' | 'comprei'
+
+/** Which actions a row offers, and where (spec §5.1, §5.2). */
+interface RowModel {
+  status: StockStatus
+  note: string
+  /** has a number: − número + */
+  counted: boolean
+  /** no number yet: "—" and "Quantos há?" */
+  toCount: boolean
+  /** today's actions (Falta / Comprei / Ainda há), driven by the rhythm */
+  rhythmActions: boolean
+  /** Comprei takes the place of "+" (counted, at 0, not just bought) */
+  buyInStepper: boolean
+  /** the "⋯" menu of a counted row */
+  menu: MenuEntry[]
+}
+
+function rowModel(p: Product, items: ShoppingItem[], today: DateKey, bags: FreezerBag[]): RowModel {
+  const status = stockStatus(p, items, today, bags)
+  const counted = isCounted(p)
+  const onList = items.some(i => i.productId === p.id)
+  // at 0 Comprei takes the place of "+"; not when just bought and still waiting for its number
+  const buyInStepper = counted && shownCount(p) === 0 && !p.qtyPending
+  const menu: MenuEntry[] = []
+  if (counted && !onList) menu.push('falta')
+  if (counted && !buyInStepper) menu.push('comprei')
+
+  let note: string
+  if (counted) note = countedNote(p, items, today)
+  else {
+    note = status === 'talvez' ? lateNote(p, today) : rhythmNote(p, today)
+    if (p.uncounted) note = `sem contar · ${note}`
+    if (status === 'ha' && (p.snoozeCount ?? 0) >= MAX_SNOOZES) note += ' · não sugiro até voltarem a comprar'
+  }
+  return { status, note, counted, toCount: !counted && !p.uncounted, rhythmActions: !counted, buyInStepper, menu }
+}
 
 export default function Casa() {
   const { uid } = useSession()
@@ -86,6 +123,9 @@ export default function Casa() {
   // "Quantos há?" / "Quantos compraste?" open under one row at a time
   const [ask, setAsk] = useState<Ask | null>(null)
   const [menuFor, setMenuFor] = useState<string | null>(null)
+  // an offer like "Pôr na lista" can stay open a while: it reads the list as it is when tapped
+  const itemsRef = useRef(items)
+  useEffect(() => { itemsRef.current = items }, [items])
 
   function chooseTab(z: Zone) {
     setTab(z)
@@ -162,7 +202,7 @@ export default function Casa() {
     setUndo({
       message: `Acabaram os ${p.name}`,
       run: back,
-      action: onList ? undefined : { label: 'Pôr na lista', run: () => markMissing(p, uid, items) },
+      action: onList ? undefined : { label: 'Pôr na lista', run: () => markMissing(p, uid, itemsRef.current) },
     })
   }
 
@@ -180,77 +220,17 @@ export default function Casa() {
     else boughtUnits(p, n, true)
   }
 
-  function productRow(p: Product) {
-    const status = stockStatus(p, items, today, bags)
-    const counted = isCounted(p)
-    const toCount = !counted && !p.uncounted
-    const onList = items.some(i => i.productId === p.id)
-    const n = shownCount(p)
-    const a = ask?.id === p.id ? ask : null
-    // Counted rows keep Falta and Comprei in a small menu; at 0 Comprei takes the place of "+"
-    const menu = counted ? [!onList && 'falta', n > 0 && 'comprei'].filter(Boolean) : []
-
-    let note: string
-    if (counted) note = countedNote(p, items, today)
-    else {
-      note = status === 'talvez' ? lateNote(p, today) : rhythmNote(p, today)
-      if (p.uncounted) note = `sem contar · ${note}`
-      if (status === 'ha' && (p.snoozeCount ?? 0) >= MAX_SNOOZES) note += ' · não sugiro até voltarem a comprar'
-    }
-
-    return (
-      <div key={p.id}>
-        <div className="row product">
-          <span className={`status-dot ${status}`} aria-hidden="true" />
-          <div className="grow">
-            <div className="product-name">{p.name}<span className="sr-only"> · {STATUS_TITLE[status]}</span></div>
-            <div className="note">{note}</div>
-          </div>
-          <div className="product-actions">
-            {/* not counted: one main action per state, the other one quieter (spec §7.4); the main one sits last, under the thumb */}
-            {!counted && status === 'talvez' && (
-              <button className="chip quiet" aria-label={`Ainda há ${p.name}`} onClick={() => snooze(p, today)}>Ainda há</button>
-            )}
-            {!counted && status === 'ha' && (
-              <button className="chip quiet" aria-label={`Comprei ${p.name}`} onClick={() => bought(p)}>Comprei</button>
-            )}
-            {!counted && status !== 'falta' && (
-              <button className={status === 'ha' ? 'chip line' : 'chip'} aria-label={`Falta ${p.name}`} onClick={() => markMissing(p, uid, items)}>Falta</button>
-            )}
-            {!counted && status === 'falta' && (
-              <button className="chip" aria-label={`Comprei ${p.name}`} onClick={() => bought(p)}>Comprei</button>
-            )}
-            {(counted || toCount) && (
-              <CountStepper value={n} label={p.name} unknown={toCount} dim={counted && staleCount(p, today)}
-                onMinus={() => minus(p)} onPlus={() => plus(p)} onNumber={() => { setMenuFor(null); setAsk({ id: p.id, kind: 'ha' }) }}
-                plus={counted && n === 0
-                  ? <button className="chip" aria-label={`Comprei ${p.name}`} onClick={() => buyCounted(p)}>Comprei</button>
-                  : undefined} />
-            )}
-            {menu.length > 0 && (
-              <button className="more-btn" aria-label={`Mais ações de ${p.name}`} aria-expanded={menuFor === p.id}
-                onClick={() => setMenuFor(menuFor === p.id ? null : p.id)}><span aria-hidden="true">⋯</span></button>
-            )}
-          </div>
-        </div>
-        {menuFor === p.id && menu.length > 0 && (
-          <div className="row-menu">
-            {menu.includes('falta') && (
-              <button className="chip line" aria-label={`Falta ${p.name}`} onClick={() => { setMenuFor(null); markMissing(p, uid, items) }}>Falta</button>
-            )}
-            {menu.includes('comprei') && (
-              <button className="chip" aria-label={`Comprei ${p.name}`} onClick={() => buyCounted(p)}>Comprei</button>
-            )}
-          </div>
-        )}
-        {a && (
-          <QtyPrompt key={a.kind} title={a.kind === 'ha' ? 'Quantos há?' : 'Quantos compraste?'} name={p.name}
-            min={a.kind === 'ha' ? 0 : 1} initial={a.kind === 'ha' && counted ? n : undefined}
-            onSave={v => answer(p, a, v)} onCancel={() => setAsk(null)} />
-        )}
-      </div>
-    )
-  }
+  const productRow = (p: Product) => (
+    <ProductRow key={p.id} p={p} model={rowModel(p, items, today, bags)} stale={staleCount(p, today)}
+      ask={ask?.id === p.id ? ask.kind : null} menuOpen={menuFor === p.id}
+      onMinus={() => minus(p)} onPlus={() => plus(p)}
+      onAsk={() => { setMenuFor(null); setAsk({ id: p.id, kind: 'ha' }) }}
+      onAnswer={(kind, n) => answer(p, { id: p.id, kind }, n)} onCancelAsk={() => setAsk(null)}
+      onToggleMenu={() => setMenuFor(menuFor === p.id ? null : p.id)}
+      onFalta={() => { setMenuFor(null); markMissing(p, uid, items) }}
+      onBuy={() => (isCounted(p) ? buyCounted(p) : bought(p))}
+      onSnooze={() => snooze(p, today)} />
+  )
 
   const here = products
     .filter(p => p.location === tab && !p.generic)
@@ -325,6 +305,72 @@ export default function Casa() {
 
       {undo && <UndoToast message={undo.message} onUndo={undo.run} onClose={closeUndo} action={undo.action} />}
     </>
+  )
+}
+
+interface ProductRowProps {
+  p: Product
+  model: RowModel
+  stale: boolean
+  /** the prompt open under this row, if any */
+  ask: Ask['kind'] | null
+  menuOpen: boolean
+  onMinus: () => void
+  onPlus: () => void
+  onAsk: () => void
+  onAnswer: (kind: Ask['kind'], n: number) => void
+  onCancelAsk: () => void
+  onToggleMenu: () => void
+  onFalta: () => void
+  onBuy: () => void
+  onSnooze: () => void
+}
+
+function ProductRow({ p, model, stale, ask, menuOpen, onMinus, onPlus, onAsk, onAnswer, onCancelAsk, onToggleMenu, onFalta, onBuy, onSnooze }: ProductRowProps) {
+  const { status, note, counted, toCount, rhythmActions, buyInStepper, menu } = model
+  const n = shownCount(p)
+  const comprei = (className: string) => <button className={className} aria-label={`Comprei ${p.name}`} onClick={onBuy}>Comprei</button>
+  const falta = (className: string) => <button className={className} aria-label={`Falta ${p.name}`} onClick={onFalta}>Falta</button>
+
+  return (
+    <div>
+      <div className="row product">
+        <span className={`status-dot ${status}`} aria-hidden="true" />
+        <div className="grow">
+          <div className="product-name">{p.name}<span className="sr-only"> · {STATUS_TITLE[status]}</span></div>
+          <div className="note">{note}</div>
+        </div>
+        <div className="product-actions">
+          {/* not counted: one main action per state, the other one quieter (spec §7.4); the main one sits last, under the thumb */}
+          {rhythmActions && status === 'talvez' && (
+            <button className="chip quiet" aria-label={`Ainda há ${p.name}`} onClick={onSnooze}>Ainda há</button>
+          )}
+          {rhythmActions && status === 'ha' && comprei('chip quiet')}
+          {rhythmActions && status !== 'falta' && falta(status === 'ha' ? 'chip line' : 'chip')}
+          {rhythmActions && status === 'falta' && comprei('chip')}
+          {(counted || toCount) && (
+            <CountStepper value={n} label={p.name} unknown={toCount} dim={counted && stale}
+              onMinus={onMinus} onPlus={toCount ? onAsk : onPlus} onNumber={onAsk}
+              plus={buyInStepper ? comprei('chip') : undefined} />
+          )}
+          {menu.length > 0 && (
+            <button className="more-btn" aria-label={`Mais ações de ${p.name}`} aria-expanded={menuOpen}
+              onClick={onToggleMenu}><span aria-hidden="true">⋯</span></button>
+          )}
+        </div>
+      </div>
+      {menuOpen && menu.length > 0 && (
+        <div className="row-menu">
+          {menu.includes('falta') && falta('chip line')}
+          {menu.includes('comprei') && comprei('chip')}
+        </div>
+      )}
+      {ask && (
+        <QtyPrompt key={ask} title={ask === 'ha' ? 'Quantos há?' : 'Quantos compraste?'} name={p.name}
+          min={ask === 'ha' ? 0 : 1} initial={ask === 'ha' && counted ? n : undefined}
+          onSave={v => onAnswer(ask, v)} onCancel={onCancelAsk} />
+      )}
+    </div>
   )
 }
 

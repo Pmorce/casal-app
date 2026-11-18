@@ -46,3 +46,20 @@ test.each([
     expect(-l - r).toBeLessThan(6)
   }
 })
+
+test('Casa stepper: "−", the number and "+" keep 44px hit areas that never overlap', () => {
+  const button = rule('.stepper button')
+  const [bt, br, bb, bl] = insets('.stepper button')
+  // − and +: 32 + overlay on each side
+  expect(px(button, 'height') - bt - bb).toBeGreaterThanOrEqual(44)
+  expect(px(button, 'width') - bl - br).toBeGreaterThanOrEqual(44)
+  // the number: 44 wide by itself, its overlay only grows up and down
+  const num = rule('.stepper button.num')
+  const [nt, nr, nb, nl] = insets('.stepper button.num')
+  expect(px(num, 'min-width')).toBeGreaterThanOrEqual(44)
+  expect(nl).toBe(0)
+  expect(nr).toBe(0)
+  expect(px(button, 'height') - nt - nb).toBeGreaterThanOrEqual(44)
+  // the gap absorbs the side overlays of "−" and "+"
+  expect(px(rule('.stepper.count'), 'gap')).toBeGreaterThanOrEqual(Math.max(-bl, -br))
+})
