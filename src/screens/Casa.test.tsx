@@ -202,6 +202,33 @@ test('Rui keeps tapping "−" on Iogurtes 1 before the screen updates: nothing i
   expect(screen.getByText('Acabaram os Iogurtes')).toBeTruthy()
 })
 
+test('after Desfazer on "−" (snapshot caught up), the next "−" still says "Acabaram os Iogurtes"', () => {
+  data.products = [fridge({ id: 'i', name: 'Iogurtes', count: 1 })]
+  const { rerender } = renderIt('Frigorífico')
+  fireEvent.click(screen.getByRole('button', { name: 'Menos Iogurtes' }))
+  data.products = [fridge({ id: 'i', name: 'Iogurtes', count: 0 })]
+  rerender(<MemoryRouter><Casa /></MemoryRouter>)
+  fireEvent.click(screen.getByRole('button', { name: 'Desfazer' }))
+  data.products = [fridge({ id: 'i', name: 'Iogurtes', count: 1 })]
+  rerender(<MemoryRouter><Casa /></MemoryRouter>)
+  fireEvent.click(screen.getByRole('button', { name: 'Menos Iogurtes' }))
+  expect(screen.getByText('Acabaram os Iogurtes')).toBeTruthy()
+})
+
+test('after Desfazer on "+" (snapshot caught up), the next "−" still writes -1', () => {
+  data.products = [fridge({ id: 'i', name: 'Iogurtes', count: 1 })]
+  const { rerender } = renderIt('Frigorífico')
+  fireEvent.click(screen.getByRole('button', { name: 'Mais Iogurtes' }))
+  data.products = [fridge({ id: 'i', name: 'Iogurtes', count: 2 })]
+  rerender(<MemoryRouter><Casa /></MemoryRouter>)
+  fireEvent.click(screen.getByRole('button', { name: 'Desfazer' }))
+  data.products = [fridge({ id: 'i', name: 'Iogurtes', count: 1 })]
+  rerender(<MemoryRouter><Casa /></MemoryRouter>)
+  fireEvent.click(screen.getByRole('button', { name: 'Menos Iogurtes' }))
+  expect(stock.changeCount).toHaveBeenCalledTimes(3)
+  expect(stock.changeCount).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'i' }), -1)
+})
+
 test('"Comprei" on a product with a pending quantity clears it; Desfazer puts it back', () => {
   data.products = [fridge({ id: 'i', name: 'Iogurtes', count: 0, qtyPending: true, lastQty: 6 })]
   renderIt('Frigorífico')

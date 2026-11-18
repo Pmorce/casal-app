@@ -149,6 +149,10 @@ export default function Casa() {
     return o && Date.now() - o.at <= OPTIMISTIC_MS ? o.n : shownCount(p)
   }
   const leave = (p: Product, n: number) => { optimistic.current[p.id] = { n, at: Date.now() } }
+  // an undo can come long after the tap: it counts from the latest product, not the one the tap closed over
+  const productsRef = useRef(products)
+  useEffect(() => { productsRef.current = products }, [products])
+  const latestCount = (p: Product): number => countOf(productsRef.current.find(x => x.id === p.id) ?? p)
 
   useEffect(() => {
     if (!highlight || openedPending.current) return
@@ -239,7 +243,7 @@ export default function Casa() {
     if (n <= 0) return
     changeCount(p, -1)
     leave(p, n - 1)
-    const back = () => { changeCount(p, 1); leave(p, countOf(p) + 1) }
+    const back = () => { changeCount(p, 1); leave(p, latestCount(p) + 1) }
     if (n > 1) return setUndo({ message: `«${p.name}»: agora ${n - 1}`, run: back })
     const onList = items.some(i => i.productId === p.id)
     setUndo({
@@ -254,7 +258,7 @@ export default function Casa() {
     const n = countOf(p)
     changeCount(p, 1)
     leave(p, n + 1)
-    setUndo({ message: `«${p.name}»: agora ${n + 1}`, run: () => { changeCount(p, -1); leave(p, Math.max(0, countOf(p) - 1)) } })
+    setUndo({ message: `«${p.name}»: agora ${n + 1}`, run: () => { changeCount(p, -1); leave(p, Math.max(0, latestCount(p) - 1)) } })
   }
 
   function answer(p: Product, a: Ask, n: number) {
