@@ -13,8 +13,8 @@ vi.mock('../data/session', () => ({ useSession: () => ({ uid: 'P', name: 'Ana', 
 vi.mock('../hooks/useToday', () => ({ useToday: () => '2026-10-29' }))
 const repo = vi.hoisted(() => ({
   addProduct: vi.fn(), deleteProduct: vi.fn(), renameProduct: vi.fn(), moveProduct: vi.fn(),
-  markMissing: vi.fn(), undoBought: vi.fn(), snooze: vi.fn(), setFreezerCategory: vi.fn(),
-  boughtOutside: vi.fn((p: unknown) => ({ product: p, items: [] })),
+  markMissing: vi.fn(), unmakeGeneric: vi.fn(), undoBought: vi.fn(), snooze: vi.fn(), setFreezerCategory: vi.fn(),
+  boughtOutside: vi.fn((p: unknown) => ({ product: p, items: [], purchaseId: 'pu1' })),
 }))
 vi.mock('../data/shoppingRepo', () => repo)
 vi.mock('../data/restore', () => ({ restore: vi.fn() }))
@@ -32,7 +32,7 @@ test('each product shows its rhythm and has Falta and Comprei', () => {
   fireEvent.click(screen.getByRole('button', { name: 'Falta Café' }))
   expect(repo.markMissing).toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: 'Comprei Café' }))
-  expect(repo.boughtOutside).toHaveBeenCalledWith(expect.objectContaining({ id: 'c' }), [], '2026-10-29')
+  expect(repo.boughtOutside).toHaveBeenCalledWith(expect.objectContaining({ id: 'c' }), [], '2026-10-29', 'P')
   expect(screen.getByRole('button', { name: 'Desfazer' })).toBeTruthy()
 })
 
@@ -185,4 +185,14 @@ test('a product snoozed 3 times but now on the list does not say "não sugiro"',
   data.shopping = [item({ productId: 'c' })]
   renderIt()
   expect(screen.queryByText(/não sugiro/)).toBeNull()
+})
+
+test('a generic product is hidden from the states and shown in Editar, where it can stop being generic', () => {
+  data.products = [prod({ id: 'carne', name: 'Carne', location: 'congelador', generic: true }), prod({ id: 'c', name: 'Café' })]
+  renderIt()
+  expect(screen.queryByText('Carne')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
+  expect(screen.getByDisplayValue('Carne')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Deixar de ser genérico' }))
+  expect(repo.unmakeGeneric).toHaveBeenCalledWith(expect.objectContaining({ id: 'carne' }))
 })

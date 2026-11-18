@@ -37,3 +37,8 @@ test('maybeMissing lists Congelador products without bags first, never by rhythm
   expect(maybeMissing([c, v], [], '2026-10-29', []).map(m => [m.product.id, m.reason])).toEqual([['v', 'congelador'], ['c', 'ritmo']])
   expect(maybeMissing([v], [], '2026-10-29', [bag({ productId: 'v' })])).toEqual([])
 })
+
+test('maybeMissing never lists a generic product without bags', () => {
+  const carne = prod({ id: 'carne', name: 'Carne', location: 'congelador', generic: true, boughtKeys: ['2026-09-01', '2026-09-11', '2026-09-21'], freezerLast: { amount: 1, unit: 'kg', key: '2026-09-21' } })
+  expect(maybeMissing([carne], [], '2026-10-29', [])).toEqual([])
+})

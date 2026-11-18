@@ -1,5 +1,5 @@
 import {
-  addItem, addPart, boughtOutside, clearParts, ensureMeatProduct, finish, markMissing, removePart, renameProduct, setFreezerCategory, toggleCart, undoFinish,
+  addItem, addPart, boughtOutside, clearParts, ensureMeatProduct, finish, markMissing, removePart, renameProduct, setFreezerCategory, toggleCart, undoBought, undoFinish,
 } from './shoppingRepo'
 import { bag, item, part, prod } from '../domain/testFactories'
 import { fire } from './write'
@@ -11,6 +11,7 @@ const fs = vi.hoisted(() => ({
   set: vi.fn(), update: vi.fn(), del: vi.fn(), commit: vi.fn(async () => {}),
   updateDoc: vi.fn(async () => {}),
   setDoc: vi.fn(async () => {}),
+  deleteDoc: vi.fn(async () => {}),
 }))
 vi.mock('./firebase', () => ({ db: {} }))
 vi.mock('./write', () => ({ fire: vi.fn() }))
@@ -22,6 +23,7 @@ vi.mock('firebase/firestore', async () => ({
   addDoc: fs.addDoc,
   updateDoc: fs.updateDoc,
   setDoc: fs.setDoc,
+  deleteDoc: fs.deleteDoc,
   writeBatch: () => ({ set: fs.set, update: fs.update, delete: fs.del, commit: fs.commit }),
   deleteField: () => 'DEL',
   serverTimestamp: () => 'now',
@@ -111,10 +113,20 @@ test('finish without a trip does not touch meta/trip', () => {
 })
 
 test('boughtOutside records the purchase and takes the pending item off the list', () => {
-  boughtOutside(prod({ id: 'p1' }), [item({ id: 'i1', productId: 'p1', status: 'porComprar' }), item({ productId: 'p1', status: 'carrinho' })], '2026-10-29')
+  boughtOutside(prod({ id: 'p1' }), [item({ id: 'i1', productId: 'p1', status: 'porComprar' }), item({ productId: 'p1', status: 'carrinho' })], '2026-10-29', 'P')
   expect(fs.updateDoc).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ boughtKeys: ['2026-10-29'] }))
   expect(fs.del).toHaveBeenCalledTimes(1)
   expect(fs.update).not.toHaveBeenCalled()
+})
+
+test('boughtOutside writes a purchase row by the user, without a store; undoBought deletes it', () => {
+  const snap = boughtOutside(prod({ id: 'p1', name: 'Leite' }), [], '2026-10-29', 'P')
+  const row = fs.setDoc.mock.calls[0] as unknown[]
+  expect(row[1]).toEqual({ name: 'Leite', productId: 'p1', dateKey: '2026-10-29', by: 'P', finishId: expect.any(String), createdAt: 'now' })
+  expect(row[1]).not.toHaveProperty('store')
+  expect(snap.purchaseId).toBeTruthy()
+  undoBought(snap)
+  expect(fs.deleteDoc).toHaveBeenCalledWith(expect.objectContaining({ path: `purchases/${snap.purchaseId}` }))
 })
 
 test('undoFinish puts the items back and deletes rhythm fields that did not exist before', () => {

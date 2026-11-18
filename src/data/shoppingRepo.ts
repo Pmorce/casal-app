@@ -183,21 +183,26 @@ export function undoFinish(done: FinishedShopping): void {
 export interface BoughtSnapshot {
   product: Product
   items: ShoppingItem[]
+  /** the purchase row this "Comprei" wrote */
+  purchaseId: string
 }
 
 /** "Comprei": a purchase made outside the app (milk on the way home), so the rhythm stays right. */
-export function boughtOutside(p: Product, items: ShoppingItem[], today: DateKey): BoughtSnapshot {
+export function boughtOutside(p: Product, items: ShoppingItem[], today: DateKey, uid: string): BoughtSnapshot {
   const pending = itemsOfProduct(p.id, items)
+  const ref = doc(collection(db, 'purchases'))
+  fire(setDoc(ref, { name: p.name, productId: p.id, dateKey: today, by: uid, finishId: doc(collection(db, 'purchases')).id, createdAt: serverTimestamp() }))
   updateProduct(p.id, purchased(p, today))
   if (pending.length) {
     const batch = writeBatch(db)
     pending.forEach(i => batch.delete(doc(db, 'shopping', i.id)))
     fire(batch.commit())
   }
-  return { product: p, items: pending }
+  return { product: p, items: pending, purchaseId: ref.id }
 }
 
 export function undoBought(s: BoughtSnapshot): void {
+  fire(deleteDoc(doc(db, 'purchases', s.purchaseId)))
   updateProduct(s.product.id, restoreRhythm(s.product))
   for (const { id, ...data } of s.items) fire(setDoc(doc(db, 'shopping', id), data))
 }
@@ -225,6 +230,9 @@ export function renameProduct(p: Product, name: string, items: ShoppingItem[], b
 
 export const setFreezerCategory = (p: Product, freezerCategory: 'carne' | 'outros') =>
   fire(updateDoc(doc(db, 'products', p.id), { freezerCategory }))
+
+/** "Deixar de ser genérico": the product is suggested again. */
+export const unmakeGeneric = (p: Product) => fire(updateDoc(doc(db, 'products', p.id), { generic: deleteField() }))
 
 export const moveProduct = (p: Product, location: Zone) => fire(updateDoc(doc(db, 'products', p.id), { location }))
 

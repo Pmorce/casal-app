@@ -2,7 +2,7 @@ import { useCallback, useState, type FormEvent } from 'react'
 import { useCollection } from '../data/useCollection'
 import { useSession } from '../data/session'
 import { useToday } from '../hooks/useToday'
-import { addProduct, boughtOutside, deleteProduct, markMissing, moveProduct, renameProduct, setFreezerCategory, snooze, undoBought } from '../data/shoppingRepo'
+import { addProduct, boughtOutside, deleteProduct, markMissing, moveProduct, renameProduct, setFreezerCategory, snooze, undoBought, unmakeGeneric } from '../data/shoppingRepo'
 import { restore } from '../data/restore'
 import { checkRename } from '../domain/pantry'
 import { MAX_SNOOZES, rhythmOf, shownGap, stockStatus, type StockStatus } from '../domain/rhythm'
@@ -79,9 +79,9 @@ export default function Casa() {
   }
 
   function bought(p: Product) {
-    const done = boughtOutside(p, items, today)
+    const done = boughtOutside(p, items, today, uid)
     setSpentFor(null)
-    if (p.location === 'congelador') setFreezing(f => (f.some(x => x.key === p.id) ? f : [...f, { key: p.id, product: p }]))
+    if (p.location === 'congelador') setFreezing(f => (f.some(x => x.key === p.id) ? f : [...f, { key: p.id, product: p, purchaseId: done.purchaseId }]))
     setUndo({
       message: `«${p.name}» comprado`,
       run: () => { undoBought(done); setFreezing(f => f.filter(x => x.key !== p.id)) },
@@ -114,7 +114,7 @@ export default function Casa() {
           <>
             {!products.length && <p className="card small muted">Sem produtos ainda.</p>}
             {STATUS.map(st => {
-              const list = byName(products.filter(p => stockStatus(p, items, today, bags) === st.value))
+              const list = byName(products.filter(p => !p.generic && stockStatus(p, items, today, bags) === st.value))
               if (!list.length) return null
               return (
                 <div className="card" key={st.value}>
@@ -200,6 +200,12 @@ function EditRow({ product, products, items, bags, onDelete }: { product: Produc
         </select>
       )}
       <button className="link-btn" onClick={onDelete}>Apagar</button>
+      {product.generic && (
+        <div className="row" style={{ width: '100%', margin: 0 }}>
+          <span className="small muted grow">genérico</span>
+          <button className="chip quiet" onClick={() => unmakeGeneric(product)}>Deixar de ser genérico</button>
+        </div>
+      )}
       {error && <p className="small error" style={{ width: '100%', margin: 0 }}>{error}</p>}
     </div>
   )

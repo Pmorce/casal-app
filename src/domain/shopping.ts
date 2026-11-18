@@ -31,7 +31,7 @@ export type MaybeMissing =
  */
 export function maybeMissing(products: Product[], items: ShoppingItem[], today: DateKey, bags: FreezerBag[]): MaybeMissing[] {
   const listed = new Set(items.flatMap(i => (i.productId ? [i.productId] : [])))
-  const open = products.filter(p => !listed.has(p.id))
+  const open = products.filter(p => !listed.has(p.id) && !p.generic)
   const frozen: MaybeMissing[] = open
     .filter(p => freezerDue(p, bags, today))
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-PT'))
