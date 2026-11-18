@@ -30,7 +30,7 @@ Testes:
 ```bash
 npm test                       # lógica e componentes
 npm run test:rules             # regras de segurança do Firestore (arranca o emulador sozinho)
-node scripts/ui-check.mjs <cenário> <pasta>   # verificação no browser (shell, compras, ida, congelador, rotinas, tarefas, hoje)
+node scripts/ui-check.mjs <cenário> <pasta>   # verificação no browser (shell, compras, ida, congelador, rotinas, tarefas, hoje, inventario)
 ```
 
 ## Publicação

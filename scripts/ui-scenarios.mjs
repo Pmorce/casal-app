@@ -411,4 +411,126 @@ export default {
     if (errors.length) throw new Error(`page errors: ${errors.join(' | ')}`)
   },
 
+  // Inventário da casa: "O que entrou", "−" até acabar, dois telemóveis a gastar, Congelador → Cozinhei, "Contar a casa".
+  async inventario({ login, shot, expectText }) {
+    const { resetDb, adminDb } = await import('./ui-admin.mjs')
+    await resetDb()
+    const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Lisbon' }).format(new Date())
+    const prod = (id, name, location, extra = {}) => adminDb.doc(`products/${id}`).set({ name, location, ...extra })
+    await prod('kefir', 'Kefir', 'frigorifico', { count: 0 })
+    await prod('iogurtes', 'Iogurtes', 'frigorifico', { count: 6, lastQty: 6 })
+    await prod('vaca', 'Vaca', 'congelador', { freezerCategory: 'carne' })
+    await prod('sal', 'Sal', 'despensa')
+    await prod('arroz', 'Arroz', 'despensa')
+    await adminDb.doc('shopping/i1').set({ text: 'Kefir', addedBy: 'ana', status: 'porComprar', productId: 'kefir' })
+    await adminDb.doc('freezerBags/b1').set({ name: 'Vaca', category: 'carne', amount: 1, unit: 'kg', addedKey: today, productId: 'vaca' })
+    const a = await login('ana')
+    const b = await login('rui')
+    const errors = []
+    for (const p of [a.page, b.page]) p.on('pageerror', e => errors.push(e.message))
+    const base = a.page.url().split('#')[0]
+    const countOf = async id => (await adminDb.doc(`products/${id}`).get()).data()?.count
+    const waitCount = async (id, want) => {
+      const t0 = Date.now()
+      while (await countOf(id) !== want) {
+        if (Date.now() - t0 > 8000) throw new Error(`${id} count should be ${want}, is ${await countOf(id)}`)
+        await a.page.waitForTimeout(150)
+      }
+      console.log(`ok: ${id} count is ${want}`)
+    }
+
+    // 1. Kefir ticked, Terminar, "O que entrou" 4 -> Casa shows Kefir 4
+    await a.page.goto(base + '#/compras')
+    await a.page.getByRole('button', { name: 'Kefir', exact: true }).click()
+    await a.page.getByRole('button', { name: /Terminar compras/ }).click()
+    await expectText(a.page, /O que entrou|Onde foi\?/, 'after Terminar')
+    if (await a.page.getByText('Onde foi?').count()) {
+      await shot(a.page, 'inv-1a-onde-foi')
+      await a.page.getByRole('button', { name: 'Não digo', exact: true }).first().click()
+    }
+    await expectText(a.page, 'O que entrou', 'O que entrou asks for Kefir')
+    await expectText(a.page, 'Só para o que é novo. Para a próxima já sei.', 'O que entrou note')
+    await a.page.getByLabel('Unidades de Kefir').fill('4')
+    await shot(a.page, 'inv-1b-o-que-entrou')
+    await a.page.getByRole('button', { name: 'Guardar' }).click()
+    await a.page.goto(base + '#/casa')
+    await a.page.getByRole('button', { name: 'Kefir: 4, mudar' }).waitFor({ timeout: 8000 })
+    console.log('ok: Casa shows Kefir 4')
+    await shot(a.page, 'inv-1c-casa-kefir-4')
+
+    // 2. "−" four times: "Acabaram os Kefir" -> "Pôr na lista" -> Kefir on the list
+    for (let i = 3; i >= 0; i--) {
+      await a.page.getByRole('button', { name: 'Menos Kefir' }).click()
+      await a.page.getByRole('button', { name: `Kefir: ${i}, mudar` }).waitFor({ timeout: 8000 })
+    }
+    await expectText(a.page, 'Acabaram os Kefir', 'toast Acabaram os Kefir')
+    await shot(a.page, 'inv-2-acabaram')
+    await a.page.getByRole('button', { name: 'Pôr na lista' }).click()
+    await a.page.goto(base + '#/compras')
+    await a.page.getByRole('button', { name: 'Kefir', exact: true }).waitFor({ timeout: 8000 })
+    console.log('ok: Kefir is in Compras')
+
+    // 3. Ana and Rui tap "−" on Iogurtes at the same time: 2 less (increments add up)
+    await Promise.all([a.page, b.page].map(p => p.goto(base + '#/casa')))
+    await Promise.all([a.page, b.page].map(p => p.getByRole('button', { name: 'Iogurtes: 6, mudar' }).waitFor({ timeout: 8000 })))
+    await Promise.all([a.page, b.page].map(p => p.getByRole('button', { name: 'Menos Iogurtes' }).click()))
+    await waitCount('iogurtes', 4)
+    await Promise.all([a.page, b.page].map(p => p.getByRole('button', { name: 'Iogurtes: 4, mudar' }).waitFor({ timeout: 8000 })))
+    console.log('ok: both phones show Iogurtes 4')
+    await shot(b.page, 'inv-3-rui-iogurtes')
+
+    // 4. Congelador: Vaca "−" -> Descongelar -> Casa "a descongelar desde hoje" -> Cozinhei Arroz de vaca 4/2
+    await a.page.goto(base + '#/congelador')
+    await a.page.getByRole('button', { name: 'Tirar um saco de Vaca' }).click()
+    await expectText(a.page, 'Para onde vai?', 'Para onde vai?')
+    await shot(a.page, 'inv-4a-para-onde-vai')
+    await a.page.getByRole('button', { name: 'Descongelar', exact: true }).click()
+    await a.page.goto(base + '#/casa')
+    await a.page.getByRole('tab', { name: 'Frigorífico' }).click()
+    await expectText(a.page, 'Para comer primeiro', 'Para comer primeiro')
+    await expectText(a.page, 'a descongelar desde hoje', 'a descongelar desde hoje')
+    await shot(a.page, 'inv-4b-descongelar')
+    await a.page.getByRole('button', { name: 'Cozinhei Vaca' }).click()
+    await expectText(a.page, 'Cozinhei com Vaca', 'Cozinhei com Vaca')
+    await a.page.getByLabel('O que fizeste').fill('Arroz de vaca')
+    await a.page.getByLabel('Para o congelador').fill('4')
+    await a.page.getByLabel('Para o frigorífico').fill('2')
+    await shot(a.page, 'inv-4c-cozinhei')
+    await a.page.getByRole('button', { name: 'Guardar', exact: true }).click()
+    await a.page.getByText(/no frigorífico há 0 dias/).first().waitFor({ timeout: 8000 })
+    console.log('ok: Frigorífico lists Arroz de vaca')
+    await shot(a.page, 'inv-4d-frigorifico')
+    const bags = (await adminDb.collection('freezerBags').get()).docs.map(d => d.data())
+    const feita = bags.filter(x => x.name === 'Arroz de vaca')
+    const inFreezer = feita.find(x => !x.where)
+    const inFridge = feita.find(x => x.where === 'frigorifico')
+    if (inFreezer?.amount !== 4 || inFridge?.amount !== 2 || inFreezer?.unit !== 'doses') throw new Error(`Arroz de vaca: ${JSON.stringify(feita)}`)
+    if (bags.some(x => x.name === 'Vaca')) throw new Error('Vaca bag should be gone after cooking')
+    console.log('ok: Arroz de vaca 4 doses in the freezer, 2 in the fridge')
+    await a.page.goto(base + '#/congelador')
+    await a.page.getByRole('button', { name: 'Comida feita' }).click()
+    await a.page.getByText('Arroz de vaca').first().waitFor({ timeout: 8000 })
+    await expectText(a.page, /4 doses/, 'Congelador shows Arroz de vaca 4 doses')
+    await shot(a.page, 'inv-4e-congelador')
+
+    // 5. Hoje: "Vamos contar a casa?" -> count the 2 products
+    await a.page.goto(base + '#/')
+    await expectText(a.page, 'Vamos contar a casa?', 'Vamos contar a casa?')
+    await expectText(a.page, /Faltam 2 produtos/, 'Faltam 2 produtos')
+    await shot(a.page, 'inv-5a-hoje')
+    await a.page.getByRole('link', { name: 'Começar' }).click()
+    await expectText(a.page, 'Contar a casa · 1 de 2', 'counting 1 of 2')
+    await a.page.getByLabel('Quantos há?').fill('3')
+    await shot(a.page, 'inv-5b-contar')
+    await a.page.getByRole('button', { name: 'Seguinte' }).click()
+    await expectText(a.page, 'Contar a casa · 2 de 2', 'counting 2 of 2')
+    await a.page.getByLabel('Quantos há?').fill('5')
+    await a.page.getByRole('button', { name: 'Seguinte' }).click()
+    await expectText(a.page, 'Obrigado! Já sei o que há em casa.', 'all counted')
+    await shot(a.page, 'inv-5c-contada')
+    await waitCount('arroz', 3)
+    await waitCount('sal', 5)
+    if (errors.length) throw new Error(`page errors: ${errors.join(' | ')}`)
+  },
+
 }
