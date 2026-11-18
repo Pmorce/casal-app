@@ -357,3 +357,28 @@ test('"Cancelar" on "Onde foi?" does not finish', () => {
   expect(screen.queryByText('Onde foi?')).toBeNull()
   expect(repo.finish).not.toHaveBeenCalled()
 })
+
+test('the note under "Terminar" names the meat types, not the generic item', () => {
+  data.products = [
+    prod({ id: 'c', name: 'Carne', location: 'congelador', freezerCategory: 'carne' }),
+    prod({ id: 'v', name: 'Vaca', location: 'congelador', freezerCategory: 'carne' }),
+  ]
+  data.shopping = [item({ text: 'Carne', productId: 'c', status: 'carrinho', parts: [part({ productId: 'v', name: 'Vaca', amount: 1, unit: 'kg' })] })]
+  renderIt()
+  expect(screen.getByText(/registado em Casa que compraram: Vaca\./)).toBeTruthy()
+})
+
+test('"Onde foi?" from "Terminar" goes away when the cart empties (finished on the other phone)', () => {
+  data.shopping = [item({ text: 'Café', status: 'carrinho' })]
+  const { rerender } = renderIt()
+  fireEvent.click(screen.getByRole('button', { name: /Terminar compras/ }))
+  expect(screen.getByText('Onde foi?')).toBeTruthy()
+  data.shopping = []
+  rerender(<MemoryRouter><Compras /></MemoryRouter>)
+  expect(screen.queryByText('Onde foi?')).toBeNull()
+  // ticking again later shows "Terminar compras", not the old question
+  data.shopping = [item({ text: 'Leite', status: 'carrinho' })]
+  rerender(<MemoryRouter><Compras /></MemoryRouter>)
+  expect(screen.queryByText('Onde foi?')).toBeNull()
+  expect(screen.getByRole('button', { name: /Terminar compras/ })).toBeTruthy()
+})

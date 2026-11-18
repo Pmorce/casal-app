@@ -1,4 +1,4 @@
-import { needsStoreQuestion, planFinish } from './finish'
+import { backToCasa, needsStoreQuestion, planFinish } from './finish'
 import { item, part, prod } from './testFactories'
 import type { Trip } from './types'
 
@@ -122,4 +122,26 @@ test('plain items: linked ones are recorded; "só desta vez" and deleted ones ge
   ])
   expect(plan.boughtIds).toEqual(['leite', 'gel'])
   expect(plan.freezer).toEqual([{ key: '4', productId: 'gel' }])
+})
+
+test('backToCasa names only cart items linked to a product that still exists', () => {
+  expect(backToCasa([
+    item({ text: 'Café', status: 'carrinho', productId: 'gone' }),
+    item({ text: 'Leite', status: 'carrinho', productId: 'p1' }),
+    item({ text: 'Natas', status: 'carrinho' }),
+    item({ text: 'Ovos', status: 'porComprar', productId: 'p2' }),
+  ], [prod({ id: 'p1', name: 'Leite' }), prod({ id: 'p2', name: 'Ovos' })])).toEqual(['Leite'])
+})
+
+test('backToCasa names the meat types recorded, not the "Carne" that turns generic', () => {
+  const products = [meat({ id: 'carne', name: 'Carne' }), meat({ id: 'vaca', name: 'Vaca' }), meat({ id: 'vazia', name: 'Vazia' })]
+  const items = [item({ productId: 'carne', status: 'carrinho', parts: [
+    part({ productId: 'vazia', name: 'Vazia' }), part({ productId: 'vaca', name: 'Vaca' }),
+  ] })]
+  expect(backToCasa(items, products)).toEqual(['Vaca', 'Vazia'])
+})
+
+test('backToCasa does not name a product that is already generic', () => {
+  const products = [meat({ id: 'carne', name: 'Carne', generic: true }), prod({ id: 'l', name: 'Leite' })]
+  expect(backToCasa([item({ productId: 'carne', status: 'carrinho' }), item({ productId: 'l', status: 'carrinho' })], products)).toEqual(['Leite'])
 })

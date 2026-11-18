@@ -1,4 +1,4 @@
-import { normalize, isOnList, cleanText, findProduct, backToCasa, maybeMissing } from './shopping'
+import { normalize, isOnList, cleanText, findProduct, maybeMissing } from './shopping'
 import { bag, item, prod } from './testFactories'
 
 test('normalize strips accents, case and extra spaces', () => {
@@ -19,15 +19,6 @@ test('cleanText rejects blank input and collapses spaces', () => {
 test('findProduct matches only exact normalized names', () => {
   expect(findProduct('LEITE', [prod({ name: 'Leite' })])?.name).toBe('Leite')
   expect(findProduct('Natas sem lactose ×2', [prod({ name: 'Natas sem lactose' })])).toBeUndefined()
-})
-
-test('backToCasa names only cart items linked to a product that still exists', () => {
-  expect(backToCasa([
-    item({ text: 'Café', status: 'carrinho', productId: 'gone' }),
-    item({ text: 'Leite', status: 'carrinho', productId: 'p1' }),
-    item({ text: 'Natas', status: 'carrinho' }),
-    item({ text: 'Ovos', status: 'porComprar', productId: 'p2' }),
-  ], [prod({ id: 'p1' }), prod({ id: 'p2' })])).toEqual(['Leite'])
 })
 
 test('maybeMissing lists due products not already on the list, most overdue first', () => {

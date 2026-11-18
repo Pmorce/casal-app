@@ -6,10 +6,10 @@ import { addItem, classifyItem, deleteItem, finish, markMissing, snooze, toggleC
 import { restore } from '../data/restore'
 import { undoFreeze, type FrozenBatch } from '../data/freezerRepo'
 import { addCustomStore, changeStore, leaveTrip, restoreTrip, startTrip } from '../data/tripRepo'
-import { backToCasa, maybeMissing } from '../domain/shopping'
+import { maybeMissing } from '../domain/shopping'
 import { shownGap } from '../domain/rhythm'
 import { unlinkOrphans } from '../domain/freezer'
-import { needsStoreQuestion, planFinish } from '../domain/finish'
+import { backToCasa, needsStoreQuestion, planFinish } from '../domain/finish'
 import { meatProductOf, partsLine } from '../domain/meat'
 import { activeTrip, customStores, staleTrip, storeOptions } from '../domain/stores'
 import { GROUP_LABEL, groupByZone, guessZone, ZONES } from '../domain/zones'
@@ -75,6 +75,8 @@ export default function Compras() {
   const cart = items.filter(i => i.status === 'carrinho')
   const missing = maybeMissing(products, items, today, unlinkOrphans(bags, products))
   const toCasa = backToCasa(items, products)
+  // the cart emptied meanwhile (finished on the other phone): the "Onde foi?" of "Terminar" has nothing left to ask about
+  useEffect(() => { if (!cart.length) setAskingStore(false) }, [cart.length])
 
   function submit(e: FormEvent) {
     e.preventDefault()
@@ -231,7 +233,7 @@ export default function Compras() {
             onDone={() => setSpentQueue(q => q.slice(1))} />
         )}
 
-        {askingStore && (
+        {askingStore && cart.length > 0 && (
           <StorePicker title="Onde foi?" allowNone options={storeOptions(customStores(meta), purchases)}
             onCancel={() => setAskingStore(false)}
             onAddCustom={name => addCustomStore(name, customStores(meta))}

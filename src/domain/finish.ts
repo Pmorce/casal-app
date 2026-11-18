@@ -95,3 +95,12 @@ export function planFinish(
     freezer: [...freezer, ...plainFreezer],
   }
 }
+
+/**
+ * Names whose purchase "Terminar compras" will really record in Casa (the note must not promise more):
+ * the same rule as planFinish, so meat types count and a "Carne" turning generic does not.
+ */
+export function backToCasa(items: ShoppingItem[], products: Product[]): string[] {
+  const { boughtIds } = planFinish(items, products, { trip: null, asked: null, uid: '', today: '' })
+  return products.filter(p => boughtIds.includes(p.id)).map(p => p.name).sort((a, b) => a.localeCompare(b, 'pt-PT'))
+}

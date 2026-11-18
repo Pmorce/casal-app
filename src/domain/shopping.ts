@@ -21,12 +21,6 @@ export function isOnList(text: string, items: ShoppingItem[]): boolean {
   return items.some(i => normalize(i.text) === key)
 }
 
-/** Names whose purchase "Terminar compras" will really record in Casa — the note must not promise more. */
-export function backToCasa(items: ShoppingItem[], products: Product[]): string[] {
-  const existing = new Set(products.map(p => p.id))
-  return items.filter(i => i.status === 'carrinho' && i.productId && existing.has(i.productId)).map(i => i.text)
-}
-
 export type MaybeMissing =
   | { product: Product; reason: 'ritmo'; gap: number; since: number }
   | { product: Product; reason: 'congelador' }
